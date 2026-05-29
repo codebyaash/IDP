@@ -36,6 +36,30 @@ export type TemplateUploadResult = {
   warnings: string[];
 };
 
+export type Resource = {
+  name: string;
+  type: string;
+  provider: string;
+  region: string;
+  dependencies: string[];
+  estimated_monthly_cost: number;
+};
+
+export type DeploymentPlan = {
+  template_name: string;
+  summary: {
+    create: number;
+    update: number;
+    delete: number;
+  };
+  changes: Array<{
+    action: string;
+    resource: Resource;
+    reason: string;
+  }>;
+  estimated_monthly_cost: number;
+};
+
 export async function fetchProjects(): Promise<Project[]> {
   const response = await fetch(`${API_BASE_URL}/api/projects`, { cache: "no-store" });
   if (!response.ok) {
@@ -66,6 +90,16 @@ export async function uploadTemplate(projectId: string, file: File): Promise<Tem
   });
   if (!response.ok) {
     throw new Error("Unable to upload template.");
+  }
+  return response.json();
+}
+
+export async function planTemplate(templateId: string): Promise<DeploymentPlan> {
+  const response = await fetch(`${API_BASE_URL}/api/templates/${templateId}/plan`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Unable to generate deployment plan.");
   }
   return response.json();
 }

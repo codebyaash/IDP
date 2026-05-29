@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.models import IacTemplate
-from app.schemas.deployment import ParsedTemplate
+from app.schemas.deployment import DeploymentPlan, ParsedTemplate
+from app.services.simulator import generate_plan, parse_template_content
 
 
 def create_template(db: Session, project_id: str, raw_content: str, parsed: ParsedTemplate) -> IacTemplate:
@@ -29,6 +30,14 @@ def get_template(db: Session, template_id: str) -> Optional[IacTemplate]:
 def list_templates(db: Session, project_id: str) -> list[IacTemplate]:
     statement = select(IacTemplate).where(IacTemplate.project_id == project_id).order_by(IacTemplate.version.desc())
     return list(db.scalars(statement))
+
+
+def get_template_plan(db: Session, template_id: str) -> Optional[DeploymentPlan]:
+    template = get_template(db, template_id)
+    if template is None:
+        return None
+    parsed = parse_template_content(template.file_name, template.raw_content)
+    return generate_plan(parsed)
 
 
 def _next_template_version(db: Session, project_id: str) -> int:

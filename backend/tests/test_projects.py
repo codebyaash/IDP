@@ -79,3 +79,33 @@ resource "azurerm_resource_group" "core" {
     assert listing.status_code == 200
     templates = listing.json()
     assert templates[0]["file_name"] == "main.tf"
+
+
+def test_generate_plan_from_saved_template(client: TestClient) -> None:
+    template = """
+resources:
+  - name: rg-plan-test
+    type: resource_group
+    provider: azure
+    region: eastus
+  - name: stplantest001
+    type: storage_account
+    provider: azure
+    region: eastus
+    dependencies:
+      - rg-plan-test
+"""
+
+    upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        files={"file": ("storage.yaml", template, "text/yaml")},
+    )
+    template_id = upload.json()["template"]["id"]
+
+    plan = client.post(f"/api/templates/{template_id}/plan")
+
+    assert plan.status_code == 200
+    payload = plan.json()
+    assert payload["summary"]["create"] == 2
+    assert payload["estimated_monthly_cost"] == 12
+    assert payload["changes"][1]["resource"]["name"] == "stplantest001"

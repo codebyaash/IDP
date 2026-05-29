@@ -12,6 +12,7 @@ POST   /api/projects/{project_id}/templates/upload
 GET    /api/projects/{project_id}/deployments
 POST   /api/templates/validate
 POST   /api/templates/plan
+POST   /api/templates/{template_id}/plan
 POST   /api/templates/deploy
 ```
 

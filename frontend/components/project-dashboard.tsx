@@ -1,9 +1,17 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { Activity, CloudUpload, FileCode2, GitBranch, Plus, RotateCcw } from "lucide-react";
+import { Activity, CloudUpload, FileCode2, GitBranch, ListChecks, Plus, RotateCcw } from "lucide-react";
 
-import { createProject, fetchProjects, type Project, type TemplateUploadResult, uploadTemplate } from "@/lib/api";
+import {
+  createProject,
+  fetchProjects,
+  planTemplate,
+  type DeploymentPlan,
+  type Project,
+  type TemplateUploadResult,
+  uploadTemplate,
+} from "@/lib/api";
 
 const fallbackProjects: Project[] = [
   {
@@ -29,6 +37,7 @@ export function ProjectDashboard() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<TemplateUploadResult | null>(null);
+  const [deploymentPlan, setDeploymentPlan] = useState<DeploymentPlan | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -80,7 +89,9 @@ export function ProjectDashboard() {
     setIsUploading(true);
     try {
       const result = await uploadTemplate(selectedProjectId, selectedFile);
+      const plan = await planTemplate(result.template.id);
       setUploadResult(result);
+      setDeploymentPlan(plan);
       setSelectedFile(null);
       setError("");
     } catch {
@@ -214,6 +225,57 @@ export function ProjectDashboard() {
               </div>
             ) : null}
           </section>
+
+          {deploymentPlan ? (
+            <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+              <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3">
+                  <ListChecks className="text-signal" size={20} />
+                  <div>
+                    <h2 className="text-lg font-semibold">Deployment Plan</h2>
+                    <p className="text-sm text-slate-500">{deploymentPlan.template_name}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-3 text-center text-sm">
+                  <div>
+                    <p className="font-semibold text-signal">{deploymentPlan.summary.create}</p>
+                    <p className="text-slate-500">create</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-ink">{deploymentPlan.summary.update}</p>
+                    <p className="text-slate-500">update</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-danger">{deploymentPlan.summary.delete}</p>
+                    <p className="text-slate-500">delete</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-ink">${deploymentPlan.estimated_monthly_cost}</p>
+                    <p className="text-slate-500">monthly</p>
+                  </div>
+                </div>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {deploymentPlan.changes.map((change) => (
+                  <div
+                    className="grid gap-3 px-5 py-4 text-sm md:grid-cols-[90px_1fr_auto] md:items-center"
+                    key={`${change.action}-${change.resource.type}-${change.resource.name}`}
+                  >
+                    <span className="w-fit rounded-md bg-emerald-50 px-2 py-1 font-semibold uppercase text-emerald-700">
+                      {change.action}
+                    </span>
+                    <div>
+                      <p className="font-semibold text-[#172033]">{change.resource.name}</p>
+                      <p className="text-slate-500">
+                        {change.resource.type} / {change.resource.region}
+                      </p>
+                    </div>
+                    <span className="font-semibold text-[#172033]">${change.resource.estimated_monthly_cost}/mo</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
 
         <aside className="space-y-6">

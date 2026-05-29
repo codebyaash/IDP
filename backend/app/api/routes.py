@@ -13,7 +13,7 @@ from app.services.simulator import (
     parse_template_content,
     validate_template,
 )
-from app.services.templates import create_template, list_templates
+from app.services.templates import create_template, get_template_plan, list_templates
 
 router = APIRouter(prefix="/api")
 
@@ -66,6 +66,14 @@ async def upload_project_template(
 
     template = create_template(db, project_id=project_id, raw_content=content, parsed=parsed)
     return TemplateUploadResult(template=template, resources=parsed.resources, warnings=[])
+
+
+@router.post("/templates/{template_id}/plan", response_model=DeploymentPlan)
+def plan_saved_template(template_id: str, db: Session = Depends(get_db)) -> DeploymentPlan:
+    plan = get_template_plan(db, template_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Template not found.")
+    return plan
 
 
 @router.post("/templates/validate", response_model=TemplateValidation)
