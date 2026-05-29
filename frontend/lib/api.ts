@@ -74,6 +74,29 @@ export type Deployment = {
   created_at: string | null;
 };
 
+export type PersistedResource = {
+  id: string;
+  deployment_id: string;
+  project_id: string;
+  resource_name: string;
+  resource_type: string;
+  provider: string;
+  region: string;
+  dependencies: string[];
+  estimated_monthly_cost: number;
+};
+
+export type CostEstimate = {
+  project_id: string;
+  total_monthly_cost: number;
+  resource_count: number;
+  breakdown: Array<{
+    label: string;
+    monthly_cost: number;
+    resource_count: number;
+  }>;
+};
+
 export async function fetchProjects(): Promise<Project[]> {
   const response = await fetch(`${API_BASE_URL}/api/projects`, { cache: "no-store" });
   if (!response.ok) {
@@ -132,6 +155,22 @@ export async function fetchDeployments(projectId: string): Promise<Deployment[]>
   const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/deployments`, { cache: "no-store" });
   if (!response.ok) {
     throw new Error("Unable to load deployments.");
+  }
+  return response.json();
+}
+
+export async function fetchResources(projectId: string): Promise<PersistedResource[]> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/resources`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Unable to load resources.");
+  }
+  return response.json();
+}
+
+export async function fetchCostEstimate(projectId: string): Promise<CostEstimate> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/cost-estimate`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Unable to load cost estimate.");
   }
   return response.json();
 }

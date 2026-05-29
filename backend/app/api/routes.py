@@ -3,10 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.schemas.deployment import Deployment, DeploymentPlan, TemplateValidation
 from app.schemas.project import ProjectCreate, ProjectRead
+from app.schemas.resource import CostEstimate, PersistedResource
 from app.schemas.template import TemplateRead, TemplateUploadResult
 from app.core.database import get_db
 from app.services.deployments import deploy_template, get_deployment, list_deployments
 from app.services.projects import create_project, get_project, list_projects
+from app.services.resources import get_project_cost_estimate, list_project_resources
 from app.services.simulator import (
     create_deployment,
     generate_plan,
@@ -56,6 +58,20 @@ def get_project_templates(project_id: str, db: Session = Depends(get_db)) -> lis
     if get_project(db, project_id) is None:
         raise HTTPException(status_code=404, detail="Project not found.")
     return list_templates(db, project_id)
+
+
+@router.get("/projects/{project_id}/resources", response_model=list[PersistedResource])
+def get_project_resources(project_id: str, db: Session = Depends(get_db)) -> list[PersistedResource]:
+    if get_project(db, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return list_project_resources(db, project_id)
+
+
+@router.get("/projects/{project_id}/cost-estimate", response_model=CostEstimate)
+def get_project_cost(project_id: str, db: Session = Depends(get_db)) -> CostEstimate:
+    if get_project(db, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return get_project_cost_estimate(db, project_id)
 
 
 @router.post("/projects/{project_id}/templates/upload", response_model=TemplateUploadResult, status_code=201)

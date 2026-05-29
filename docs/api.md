@@ -10,6 +10,8 @@ GET    /api/projects/{project_id}
 GET    /api/projects/{project_id}/templates
 POST   /api/projects/{project_id}/templates/upload
 GET    /api/projects/{project_id}/deployments
+GET    /api/projects/{project_id}/resources
+GET    /api/projects/{project_id}/cost-estimate
 GET    /api/deployments/{deployment_id}
 POST   /api/templates/validate
 POST   /api/templates/plan

@@ -4,6 +4,7 @@ from typing import Optional
 
 from app.models import DeploymentRecord, Project
 from app.schemas.deployment import Deployment, DeploymentPlan, DeploymentStep
+from app.services.resources import persist_resources_for_deployment
 from app.services.simulator import create_deployment
 from app.services.templates import get_template, get_template_plan
 
@@ -32,6 +33,7 @@ def deploy_template(db: Session, template_id: str) -> Optional[Deployment]:
         estimated_monthly_cost=deployment.plan.estimated_monthly_cost,
     )
     db.add(record)
+    persist_resources_for_deployment(db, record, deployment.plan)
 
     project = db.get(Project, template.project_id)
     if project is not None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from pathlib import Path
 from typing import Any, Optional
@@ -33,6 +34,8 @@ COST_BY_TYPE = {
     "subnet": 2,
     "vm": 42,
 }
+
+TERRAFORM_REFERENCE_PATTERN = re.compile(r"\${([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)\.[^}]+}")
 
 
 def parse_template_content(file_name: str, content: str) -> ParsedTemplate:
@@ -127,6 +130,7 @@ def _resources_from_terraform(document: dict[str, Any]) -> list[Resource]:
                         name=name,
                         resource_type=resource_type,
                         region=config.get("location", "eastus") if isinstance(config, dict) else "eastus",
+                        dependencies=_extract_terraform_dependencies(config),
                     )
                 )
     return resources
@@ -174,3 +178,25 @@ def _build_resource(
         dependencies=dependencies or [],
         estimated_monthly_cost=COST_BY_TYPE.get(resource_type, 8),
     )
+
+
+def _extract_terraform_dependencies(config: Any) -> list[str]:
+    dependencies: list[str] = []
+    _collect_terraform_dependencies(config, dependencies)
+    return list(dict.fromkeys(dependencies))
+
+
+def _collect_terraform_dependencies(value: Any, dependencies: list[str]) -> None:
+    if isinstance(value, str):
+        for _, resource_name in TERRAFORM_REFERENCE_PATTERN.findall(value):
+            dependencies.append(resource_name)
+        return
+
+    if isinstance(value, list):
+        for item in value:
+            _collect_terraform_dependencies(item, dependencies)
+        return
+
+    if isinstance(value, dict):
+        for item in value.values():
+            _collect_terraform_dependencies(item, dependencies)

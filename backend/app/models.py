@@ -24,6 +24,7 @@ class Project(Base):
 
     templates: Mapped[list["IacTemplate"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     deployments: Mapped[list["DeploymentRecord"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    resources: Mapped[list["ResourceRecord"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
 class IacTemplate(Base):
@@ -53,3 +54,22 @@ class DeploymentRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     project: Mapped[Project] = relationship(back_populates="deployments")
+    resources: Mapped[list["ResourceRecord"]] = relationship(back_populates="deployment", cascade="all, delete-orphan")
+
+
+class ResourceRecord(Base):
+    __tablename__ = "resources"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    deployment_id: Mapped[str] = mapped_column(ForeignKey("deployments.id"), nullable=False)
+    resource_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(255), nullable=False)
+    provider: Mapped[str] = mapped_column(String(80), nullable=False, default="azure")
+    region: Mapped[str] = mapped_column(String(80), nullable=False, default="eastus")
+    dependencies: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    estimated_monthly_cost: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    project: Mapped[Project] = relationship(back_populates="resources")
+    deployment: Mapped[DeploymentRecord] = relationship(back_populates="resources")

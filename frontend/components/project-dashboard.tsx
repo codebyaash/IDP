@@ -2,15 +2,20 @@
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Activity, CloudUpload, FileCode2, GitBranch, ListChecks, Play, Plus, RotateCcw } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import {
   createProject,
   deployTemplate,
+  fetchCostEstimate,
   fetchDeployments,
   fetchProjects,
+  fetchResources,
   planTemplate,
+  type CostEstimate,
   type Deployment,
   type DeploymentPlan,
+  type PersistedResource,
   type Project,
   type TemplateUploadResult,
   uploadTemplate,
@@ -43,6 +48,8 @@ export function ProjectDashboard() {
   const [deploymentPlan, setDeploymentPlan] = useState<DeploymentPlan | null>(null);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [latestDeployment, setLatestDeployment] = useState<Deployment | null>(null);
+  const [resources, setResources] = useState<PersistedResource[]>([]);
+  const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [error, setError] = useState("");
 
@@ -72,10 +79,27 @@ export function ProjectDashboard() {
       .catch(() => {
         setDeployments([]);
       });
+
+    fetchResources(selectedProjectId)
+      .then((data) => {
+        setResources(data);
+      })
+      .catch(() => {
+        setResources([]);
+      });
+
+    fetchCostEstimate(selectedProjectId)
+      .then((data) => {
+        setCostEstimate(data);
+      })
+      .catch(() => {
+        setCostEstimate(null);
+      });
   }, [selectedProjectId]);
 
   const totalCost = useMemo(() => projects.reduce((sum, project) => sum + project.monthly_cost, 0), [projects]);
   const deploymentCount = projects.length * 7;
+  const resourceTypeCostData = costEstimate?.breakdown ?? [];
 
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,8 +154,21 @@ export function ProjectDashboard() {
     setIsDeploying(true);
     try {
       const deployment = await deployTemplate(uploadResult.template.id);
+      const [nextResources, nextCostEstimate] = await Promise.all([
+        fetchResources(deployment.project_id),
+        fetchCostEstimate(deployment.project_id),
+      ]);
       setLatestDeployment(deployment);
       setDeployments((current) => [deployment, ...current.filter((item) => item.id !== deployment.id)]);
+      setResources(nextResources);
+      setCostEstimate(nextCostEstimate);
+      setProjects((current) =>
+        current.map((project) =>
+          project.id === deployment.project_id
+            ? { ...project, monthly_cost: nextCostEstimate.total_monthly_cost, status: "deployed" }
+            : project,
+        ),
+      );
       setError("");
     } catch {
       setError("Could not run deployment simulation for this template.");
@@ -161,7 +198,7 @@ export function ProjectDashboard() {
             {[
               ["Success rate", "96%", "Last 30 days"],
               ["Projects tracked", String(projects.length), isLoading ? "Loading API data" : "Stored locally"],
-              ["Estimated spend", `$${totalCost}/mo`, "Simulation only"],
+              ["Estimated spend", `$${totalCost}/mo`, "Backed by saved deployments"],
             ].map(([label, value, detail]) => (
               <article key={label} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-sm text-slate-500">{label}</p>
@@ -355,10 +392,10 @@ export function ProjectDashboard() {
           <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-3">
               <Activity className="text-signal" />
-              <h2 className="text-lg font-semibold">Mock Pipeline</h2>
+              <h2 className="text-lg font-semibold">Pipeline</h2>
             </div>
             <div className="mt-5 space-y-3">
-              {pipeline.map((stage, index) => (
+              {(latestDeployment?.steps.map((step) => step.name) ?? pipeline).map((stage, index) => (
                 <div key={stage} className="flex items-center justify-between rounded-md bg-panel px-4 py-3">
                   <span className="text-sm font-medium">{stage}</span>
                   <span className="text-xs font-semibold text-signal">step {index + 1}</span>
@@ -391,13 +428,57 @@ export function ProjectDashboard() {
               <GitBranch className="text-ink" />
               <h2 className="text-lg font-semibold">Resource Graph</h2>
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-              {["resource group", "vnet", "subnet", "vm"].map((item) => (
-                <div key={item} className="rounded-md border border-slate-200 bg-panel px-3 py-4 text-center font-medium">
-                  {item}
-                </div>
-              ))}
+            {resources.length > 0 ? (
+              <div className="mt-5 space-y-3">
+                {resources.map((resource) => (
+                  <div key={resource.id} className="rounded-md border border-slate-200 bg-panel px-4 py-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-semibold">{resource.resource_name}</span>
+                      <span className="text-xs uppercase text-slate-500">{resource.resource_type}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{resource.region}</p>
+                    <p className="mt-2 text-xs text-signal">
+                      {resource.dependencies.length > 0
+                        ? `depends on ${resource.dependencies.join(", ")}`
+                        : "root resource"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-5 text-sm text-slate-500">Deploy a template to populate the dependency graph.</p>
+            )}
+          </section>
+
+          <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <Activity className="text-ink" />
+              <h2 className="text-lg font-semibold">Cost Dashboard</h2>
             </div>
+            {costEstimate && resourceTypeCostData.length > 0 ? (
+              <>
+                <div className="mt-4 flex items-end justify-between">
+                  <div>
+                    <p className="text-sm text-slate-500">Current deployed monthly cost</p>
+                    <p className="text-3xl font-semibold">${costEstimate.total_monthly_cost}</p>
+                  </div>
+                  <p className="text-sm text-slate-500">{costEstimate.resource_count} resources</p>
+                </div>
+                <div className="mt-5 h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={resourceTypeCostData}>
+                      <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+                      <YAxis tickLine={false} axisLine={false} fontSize={12} />
+                      <Tooltip />
+                      <Bar dataKey="monthly_cost" fill="#2a9d8f" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            ) : (
+              <p className="mt-5 text-sm text-slate-500">No deployed resources yet, so there is no cost breakdown to chart.</p>
+            )}
           </section>
 
           <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">

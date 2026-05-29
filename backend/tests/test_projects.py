@@ -122,6 +122,8 @@ resources:
     type: storage_account
     provider: azure
     region: eastus
+    dependencies:
+      - rg-history-test
 """
 
     upload = client.post(
@@ -144,3 +146,19 @@ resources:
     deployments = history.json()
     assert deployments[0]["id"] == payload["id"]
     assert deployments[0]["plan"]["estimated_monthly_cost"] == 12
+
+    resources = client.get("/api/projects/demo-azure-core/resources")
+
+    assert resources.status_code == 200
+    resource_payload = resources.json()
+    assert len(resource_payload) == 2
+    assert resource_payload[0]["deployment_id"] == payload["id"]
+    assert any(resource["dependencies"] == ["rg-history-test"] for resource in resource_payload if resource["resource_name"] == "stdeployhistory001")
+
+    cost = client.get("/api/projects/demo-azure-core/cost-estimate")
+
+    assert cost.status_code == 200
+    cost_payload = cost.json()
+    assert cost_payload["total_monthly_cost"] == 12
+    assert cost_payload["resource_count"] == 2
+    assert any(item["label"] == "storage_account" for item in cost_payload["breakdown"])
