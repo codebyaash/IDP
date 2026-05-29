@@ -5,6 +5,10 @@ Initial API surface:
 ```text
 GET    /health
 GET    /api/projects
+POST   /api/projects
+GET    /api/projects/{project_id}
+GET    /api/projects/{project_id}/templates
+POST   /api/projects/{project_id}/templates/upload
 GET    /api/projects/{project_id}/deployments
 POST   /api/templates/validate
 POST   /api/templates/plan

@@ -24,7 +24,7 @@ The first portfolio version is intentionally simulation-first: it demonstrates D
 | Frontend | Next.js, Tailwind CSS, React Flow, Recharts, lucide-react |
 | Backend | FastAPI, Python, Pydantic |
 | IaC Parsing | python-hcl2, PyYAML, JSON parser |
-| Database | Supabase PostgreSQL |
+| Database | SQLite locally, Supabase PostgreSQL planned |
 | Hosting | Vercel Hobby, Render Free Web Service |
 | CI/CD | GitHub Actions |
 
@@ -49,6 +49,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
+
+The backend creates a local `deployforge.db` SQLite database on startup and seeds a demo Azure project.
 
 Frontend:
 

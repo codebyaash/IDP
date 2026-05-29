@@ -1,12 +1,27 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
+from app.core.database import Base, SessionLocal, engine
+from app import models
+from app.services.projects import seed_demo_project
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        seed_demo_project(db)
+    yield
+
 
 app = FastAPI(
     title="DeployForge API",
     description="Simulation-first infrastructure deployment platform API.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

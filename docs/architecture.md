@@ -9,7 +9,7 @@ User
   -> Next.js frontend
   -> FastAPI backend
   -> IaC parser and deployment simulator
-  -> Supabase PostgreSQL
+  -> SQLite locally, Supabase PostgreSQL for hosted deployment
   -> resource graph, pipeline logs, rollback history
 ```
 
@@ -19,6 +19,7 @@ User
 - Parser services extract resource names, types, regions, dependencies, and cost hints.
 - Planner services compare parsed templates with simulated state.
 - Deployment simulator emits deterministic pipeline steps and logs.
+- Project data is persisted in a local SQLite database during development.
 - History services will persist deployments, resources, rollback events, policy violations, and audit logs.
 
 ## Database Tables

@@ -26,25 +26,13 @@ COST_BY_TYPE = {
     "azurerm_subnet": 2,
     "azurerm_public_ip": 4,
     "azurerm_network_security_group": 3,
+    "azurerm_resource_group": 0,
     "resource_group": 0,
     "storage_account": 12,
     "virtual_network": 5,
     "subnet": 2,
     "vm": 42,
 }
-
-
-def list_projects() -> list[dict[str, Any]]:
-    return [
-        {
-            "id": "demo-azure-core",
-            "name": "Azure Core Network",
-            "cloud_provider": "azure",
-            "environment": "dev",
-            "status": "healthy",
-            "monthly_cost": 63,
-        }
-    ]
 
 
 def parse_template_content(file_name: str, content: str) -> ParsedTemplate:
