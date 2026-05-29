@@ -1,0 +1,11 @@
+resources:
+  - name: rg-analytics-stage
+    type: resource_group
+    provider: azure
+    region: eastus
+  - name: stanalyticsstage001
+    type: storage_account
+    provider: azure
+    region: eastus
+    dependencies:
+      - rg-analytics-stage
