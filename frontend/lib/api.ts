@@ -60,6 +60,20 @@ export type DeploymentPlan = {
   estimated_monthly_cost: number;
 };
 
+export type Deployment = {
+  id: string;
+  project_id: string;
+  status: string;
+  plan: DeploymentPlan;
+  steps: Array<{
+    name: string;
+    status: string;
+    logs: string[];
+    sequence_order: number;
+  }>;
+  created_at: string | null;
+};
+
 export async function fetchProjects(): Promise<Project[]> {
   const response = await fetch(`${API_BASE_URL}/api/projects`, { cache: "no-store" });
   if (!response.ok) {
@@ -100,6 +114,24 @@ export async function planTemplate(templateId: string): Promise<DeploymentPlan> 
   });
   if (!response.ok) {
     throw new Error("Unable to generate deployment plan.");
+  }
+  return response.json();
+}
+
+export async function deployTemplate(templateId: string): Promise<Deployment> {
+  const response = await fetch(`${API_BASE_URL}/api/templates/${templateId}/deploy`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Unable to run deployment.");
+  }
+  return response.json();
+}
+
+export async function fetchDeployments(projectId: string): Promise<Deployment[]> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/deployments`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Unable to load deployments.");
   }
   return response.json();
 }

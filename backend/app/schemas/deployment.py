@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -50,3 +53,4 @@ class Deployment(BaseModel):
     status: str
     plan: DeploymentPlan
     steps: list[DeploymentStep]
+    created_at: Optional[datetime] = None

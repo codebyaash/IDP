@@ -10,9 +10,11 @@ GET    /api/projects/{project_id}
 GET    /api/projects/{project_id}/templates
 POST   /api/projects/{project_id}/templates/upload
 GET    /api/projects/{project_id}/deployments
+GET    /api/deployments/{deployment_id}
 POST   /api/templates/validate
 POST   /api/templates/plan
 POST   /api/templates/{template_id}/plan
+POST   /api/templates/{template_id}/deploy
 POST   /api/templates/deploy
 ```
 

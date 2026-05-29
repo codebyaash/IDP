@@ -109,3 +109,38 @@ resources:
     assert payload["summary"]["create"] == 2
     assert payload["estimated_monthly_cost"] == 12
     assert payload["changes"][1]["resource"]["name"] == "stplantest001"
+
+
+def test_deploy_saved_template_and_list_history(client: TestClient) -> None:
+    template = """
+resources:
+  - name: rg-history-test
+    type: resource_group
+    provider: azure
+    region: eastus
+  - name: stdeployhistory001
+    type: storage_account
+    provider: azure
+    region: eastus
+"""
+
+    upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        files={"file": ("history.yaml", template, "text/yaml")},
+    )
+    template_id = upload.json()["template"]["id"]
+
+    deployment = client.post(f"/api/templates/{template_id}/deploy")
+
+    assert deployment.status_code == 201
+    payload = deployment.json()
+    assert payload["status"] == "success"
+    assert payload["plan"]["summary"]["create"] == 2
+    assert len(payload["steps"]) == 5
+
+    history = client.get("/api/projects/demo-azure-core/deployments")
+
+    assert history.status_code == 200
+    deployments = history.json()
+    assert deployments[0]["id"] == payload["id"]
+    assert deployments[0]["plan"]["estimated_monthly_cost"] == 12

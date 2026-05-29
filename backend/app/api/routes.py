@@ -5,11 +5,11 @@ from app.schemas.deployment import Deployment, DeploymentPlan, TemplateValidatio
 from app.schemas.project import ProjectCreate, ProjectRead
 from app.schemas.template import TemplateRead, TemplateUploadResult
 from app.core.database import get_db
+from app.services.deployments import deploy_template, get_deployment, list_deployments
 from app.services.projects import create_project, get_project, list_projects
 from app.services.simulator import (
     create_deployment,
     generate_plan,
-    list_sample_deployments,
     parse_template_content,
     validate_template,
 )
@@ -40,7 +40,15 @@ def get_project_by_id(project_id: str, db: Session = Depends(get_db)) -> Project
 def get_project_deployments(project_id: str, db: Session = Depends(get_db)) -> list[Deployment]:
     if get_project(db, project_id) is None:
         raise HTTPException(status_code=404, detail="Project not found.")
-    return list_sample_deployments(project_id)
+    return list_deployments(db, project_id)
+
+
+@router.get("/deployments/{deployment_id}", response_model=Deployment)
+def get_deployment_by_id(deployment_id: str, db: Session = Depends(get_db)) -> Deployment:
+    deployment = get_deployment(db, deployment_id)
+    if deployment is None:
+        raise HTTPException(status_code=404, detail="Deployment not found.")
+    return deployment
 
 
 @router.get("/projects/{project_id}/templates", response_model=list[TemplateRead])
@@ -74,6 +82,14 @@ def plan_saved_template(template_id: str, db: Session = Depends(get_db)) -> Depl
     if plan is None:
         raise HTTPException(status_code=404, detail="Template not found.")
     return plan
+
+
+@router.post("/templates/{template_id}/deploy", response_model=Deployment, status_code=201)
+def deploy_saved_template(template_id: str, db: Session = Depends(get_db)) -> Deployment:
+    deployment = deploy_template(db, template_id)
+    if deployment is None:
+        raise HTTPException(status_code=404, detail="Template not found.")
+    return deployment
 
 
 @router.post("/templates/validate", response_model=TemplateValidation)

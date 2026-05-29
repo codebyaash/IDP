@@ -1,12 +1,15 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { Activity, CloudUpload, FileCode2, GitBranch, ListChecks, Plus, RotateCcw } from "lucide-react";
+import { Activity, CloudUpload, FileCode2, GitBranch, ListChecks, Play, Plus, RotateCcw } from "lucide-react";
 
 import {
   createProject,
+  deployTemplate,
+  fetchDeployments,
   fetchProjects,
   planTemplate,
+  type Deployment,
   type DeploymentPlan,
   type Project,
   type TemplateUploadResult,
@@ -38,6 +41,9 @@ export function ProjectDashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<TemplateUploadResult | null>(null);
   const [deploymentPlan, setDeploymentPlan] = useState<DeploymentPlan | null>(null);
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [latestDeployment, setLatestDeployment] = useState<Deployment | null>(null);
+  const [isDeploying, setIsDeploying] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -52,6 +58,21 @@ export function ProjectDashboard() {
       })
       .finally(() => setIsLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      return;
+    }
+
+    fetchDeployments(selectedProjectId)
+      .then((data) => {
+        setDeployments(data);
+        setLatestDeployment(data[0] ?? null);
+      })
+      .catch(() => {
+        setDeployments([]);
+      });
+  }, [selectedProjectId]);
 
   const totalCost = useMemo(() => projects.reduce((sum, project) => sum + project.monthly_cost, 0), [projects]);
   const deploymentCount = projects.length * 7;
@@ -98,6 +119,24 @@ export function ProjectDashboard() {
       setError("Could not upload template. Confirm the file has supported IaC syntax.");
     } finally {
       setIsUploading(false);
+    }
+  }
+
+  async function handleDeployTemplate() {
+    if (!uploadResult) {
+      return;
+    }
+
+    setIsDeploying(true);
+    try {
+      const deployment = await deployTemplate(uploadResult.template.id);
+      setLatestDeployment(deployment);
+      setDeployments((current) => [deployment, ...current.filter((item) => item.id !== deployment.id)]);
+      setError("");
+    } catch {
+      setError("Could not run deployment simulation for this template.");
+    } finally {
+      setIsDeploying(false);
     }
   }
 
@@ -254,6 +293,15 @@ export function ProjectDashboard() {
                     <p className="text-slate-500">monthly</p>
                   </div>
                 </div>
+                <button
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-signal px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={isDeploying || !uploadResult}
+                  onClick={handleDeployTemplate}
+                  type="button"
+                >
+                  <Play size={16} />
+                  Deploy
+                </button>
               </div>
               <div className="divide-y divide-slate-100">
                 {deploymentPlan.changes.map((change) => (
@@ -276,6 +324,31 @@ export function ProjectDashboard() {
               </div>
             </section>
           ) : null}
+
+          {latestDeployment ? (
+            <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <Activity className="text-signal" size={20} />
+                  <div>
+                    <h2 className="text-lg font-semibold">Latest Deployment</h2>
+                    <p className="text-sm text-slate-500">{latestDeployment.plan.template_name}</p>
+                  </div>
+                </div>
+                <span className="rounded-md bg-emerald-50 px-2 py-1 text-sm font-semibold capitalize text-emerald-700">
+                  {latestDeployment.status}
+                </span>
+              </div>
+              <div className="grid gap-3 px-5 py-5 md:grid-cols-5">
+                {latestDeployment.steps.map((step) => (
+                  <div className="rounded-md border border-slate-200 bg-panel p-3" key={step.name}>
+                    <p className="text-sm font-semibold">{step.name}</p>
+                    <p className="mt-2 text-xs capitalize text-signal">{step.status}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
 
         <aside className="space-y-6">
@@ -291,6 +364,25 @@ export function ProjectDashboard() {
                   <span className="text-xs font-semibold text-signal">step {index + 1}</span>
                 </div>
               ))}
+            </div>
+          </section>
+
+          <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <ListChecks className="text-signal" />
+              <h2 className="text-lg font-semibold">History</h2>
+            </div>
+            <div className="mt-5 space-y-3">
+              {deployments.slice(0, 4).map((deployment) => (
+                <div key={deployment.id} className="rounded-md bg-panel px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-sm font-medium">{deployment.plan.template_name}</span>
+                    <span className="text-xs font-semibold capitalize text-signal">{deployment.status}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">${deployment.plan.estimated_monthly_cost}/mo</p>
+                </div>
+              ))}
+              {deployments.length === 0 ? <p className="text-sm text-slate-500">No deployment runs yet.</p> : null}
             </div>
           </section>
 

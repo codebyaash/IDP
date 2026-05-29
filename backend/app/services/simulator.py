@@ -87,7 +87,7 @@ def generate_plan(template: ParsedTemplate) -> DeploymentPlan:
     )
 
 
-def create_deployment(plan: DeploymentPlan) -> Deployment:
+def create_deployment(plan: DeploymentPlan, project_id: str = "demo-azure-core") -> Deployment:
     steps = [
         DeploymentStep(name="Queued", status="success", logs=["Deployment request accepted."], sequence_order=1),
         DeploymentStep(name="Validate", status="success", logs=["IaC syntax and required fields passed."], sequence_order=2),
@@ -97,7 +97,7 @@ def create_deployment(plan: DeploymentPlan) -> Deployment:
     ]
     return Deployment(
         id=str(uuid.uuid4()),
-        project_id="demo-azure-core",
+        project_id=project_id,
         status="success",
         plan=plan,
         steps=steps,
