@@ -1,10 +1,12 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Background, Controls, MarkerType, MiniMap, ReactFlow, type Edge, type Node } from "@xyflow/react";
 import {
   Activity,
   CloudUpload,
+  ExternalLink,
   FileCode2,
   GitBranch,
   Layers3,
@@ -753,6 +755,13 @@ export function ProjectDashboard() {
                 <span className="rounded-md bg-emerald-50 px-2 py-1 text-sm font-semibold capitalize text-emerald-700">
                   {latestDeployment.status}
                 </span>
+                <Link
+                  className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-ink"
+                  href={`/deployments/${latestDeployment.id}`}
+                >
+                  <ExternalLink size={16} />
+                  Details
+                </Link>
               </div>
               <div className="grid gap-3 px-5 py-5 md:grid-cols-5">
                 {latestDeployment.steps.map((step) => (
@@ -981,14 +990,22 @@ export function ProjectDashboard() {
                     <p className="text-xs text-slate-500">
                       ${deployment.plan.estimated_monthly_cost}/mo / {deployment.environment}
                     </p>
-                    <button
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={rollbackDeploymentId === deployment.id}
-                      onClick={() => handleRollback(deployment.id)}
-                      type="button"
-                    >
-                      Rollback
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-ink"
+                        href={`/deployments/${deployment.id}`}
+                      >
+                        Details
+                      </Link>
+                      <button
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={rollbackDeploymentId === deployment.id}
+                        onClick={() => handleRollback(deployment.id)}
+                        type="button"
+                      >
+                        Rollback
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

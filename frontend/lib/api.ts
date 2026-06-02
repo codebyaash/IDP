@@ -233,6 +233,17 @@ export async function fetchDeployments(projectId: string, token: string, environ
   return response.json();
 }
 
+export async function fetchDeployment(deploymentId: string, token: string): Promise<Deployment> {
+  const response = await fetch(`${API_BASE_URL}/api/deployments/${deploymentId}`, {
+    cache: "no-store",
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error("Unable to load deployment.");
+  }
+  return response.json();
+}
+
 export async function fetchResources(projectId: string, token: string, environment = "dev"): Promise<PersistedResource[]> {
   const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/resources?environment=${environment}`, {
     cache: "no-store",
