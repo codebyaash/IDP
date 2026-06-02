@@ -11,7 +11,9 @@ import {
   fetchDeployments,
   fetchProjects,
   fetchResources,
+  login,
   planTemplate,
+  register,
   type CostEstimate,
   type Deployment,
   type DeploymentPlan,
@@ -34,6 +36,9 @@ const fallbackProjects: Project[] = [
 ];
 
 const pipeline = ["Queued", "Validating", "Planning", "Deploying", "Success"];
+const TOKEN_STORAGE_KEY = "deployforge_token";
+const DEMO_EMAIL = "demo@deployforge.local";
+const DEMO_PASSWORD = "deployforge123";
 
 export function ProjectDashboard() {
   const [projects, setProjects] = useState<Project[]>(fallbackProjects);
@@ -51,27 +56,48 @@ export function ProjectDashboard() {
   const [resources, setResources] = useState<PersistedResource[]>([]);
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [email, setEmail] = useState(DEMO_EMAIL);
+  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchProjects()
+    const storedToken = window.localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (storedToken) {
+      setToken(storedToken);
+    } else {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    setIsLoading(true);
+    fetchProjects(token)
       .then((data) => {
         setProjects(data);
         setSelectedProjectId((current) => current || data[0]?.id || "");
         setError("");
       })
       .catch(() => {
-        setError("API unavailable. Showing demo data.");
+        window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+        setToken(null);
+        setError("Session expired. Sign in again to continue.");
       })
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [token]);
 
   useEffect(() => {
-    if (!selectedProjectId) {
+    if (!selectedProjectId || !token) {
       return;
     }
 
-    fetchDeployments(selectedProjectId)
+    fetchDeployments(selectedProjectId, token)
       .then((data) => {
         setDeployments(data);
         setLatestDeployment(data[0] ?? null);
@@ -80,7 +106,7 @@ export function ProjectDashboard() {
         setDeployments([]);
       });
 
-    fetchResources(selectedProjectId)
+    fetchResources(selectedProjectId, token)
       .then((data) => {
         setResources(data);
       })
@@ -88,14 +114,14 @@ export function ProjectDashboard() {
         setResources([]);
       });
 
-    fetchCostEstimate(selectedProjectId)
+    fetchCostEstimate(selectedProjectId, token)
       .then((data) => {
         setCostEstimate(data);
       })
       .catch(() => {
         setCostEstimate(null);
       });
-  }, [selectedProjectId]);
+  }, [selectedProjectId, token]);
 
   const totalCost = useMemo(() => projects.reduce((sum, project) => sum + project.monthly_cost, 0), [projects]);
   const deploymentCount = projects.length * 7;
@@ -103,7 +129,7 @@ export function ProjectDashboard() {
 
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!name.trim()) {
+    if (!name.trim() || !token) {
       return;
     }
 
@@ -113,7 +139,7 @@ export function ProjectDashboard() {
         name: name.trim(),
         cloud_provider: "azure",
         environment,
-      });
+      }, token);
       setProjects((current) => [project, ...current]);
       setSelectedProjectId(project.id);
       setName("");
@@ -127,14 +153,14 @@ export function ProjectDashboard() {
 
   async function handleUploadTemplate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedProjectId || !selectedFile) {
+    if (!selectedProjectId || !selectedFile || !token) {
       return;
     }
 
     setIsUploading(true);
     try {
-      const result = await uploadTemplate(selectedProjectId, selectedFile);
-      const plan = await planTemplate(result.template.id);
+      const result = await uploadTemplate(selectedProjectId, selectedFile, token);
+      const plan = await planTemplate(result.template.id, token);
       setUploadResult(result);
       setDeploymentPlan(plan);
       setSelectedFile(null);
@@ -147,16 +173,16 @@ export function ProjectDashboard() {
   }
 
   async function handleDeployTemplate() {
-    if (!uploadResult) {
+    if (!uploadResult || !token) {
       return;
     }
 
     setIsDeploying(true);
     try {
-      const deployment = await deployTemplate(uploadResult.template.id);
+      const deployment = await deployTemplate(uploadResult.template.id, token);
       const [nextResources, nextCostEstimate] = await Promise.all([
-        fetchResources(deployment.project_id),
-        fetchCostEstimate(deployment.project_id),
+        fetchResources(deployment.project_id, token),
+        fetchCostEstimate(deployment.project_id, token),
       ]);
       setLatestDeployment(deployment);
       setDeployments((current) => [deployment, ...current.filter((item) => item.id !== deployment.id)]);
@@ -177,6 +203,79 @@ export function ProjectDashboard() {
     }
   }
 
+  async function handleAuth(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsAuthenticating(true);
+    try {
+      const response =
+        authMode === "login" ? await login(email.trim(), password) : await register(email.trim(), password);
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, response.access_token);
+      setToken(response.access_token);
+      setError("");
+    } catch {
+      setError(authMode === "login" ? "Could not sign in with those credentials." : "Could not create that account.");
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }
+
+  function handleLogout() {
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    setToken(null);
+    setProjects(fallbackProjects);
+    setDeployments([]);
+    setLatestDeployment(null);
+    setResources([]);
+    setCostEstimate(null);
+    setDeploymentPlan(null);
+    setUploadResult(null);
+  }
+
+  if (!token) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f6f8fb] px-6 text-[#172033]">
+        <section className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-wide text-signal">DeployForge</p>
+          <h1 className="mt-2 text-2xl font-semibold">Sign in to your deployment workspace</h1>
+          <form className="mt-6 space-y-4" onSubmit={handleAuth}>
+            <input
+              className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-signal"
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="Email"
+              type="email"
+              value={email}
+            />
+            <input
+              className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-signal"
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Password"
+              type="password"
+              value={password}
+            />
+            {error ? <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{error}</p> : null}
+            <button
+              className="inline-flex h-11 w-full items-center justify-center rounded-md bg-ink px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isAuthenticating}
+              type="submit"
+            >
+              {authMode === "login" ? "Sign in" : "Create account"}
+            </button>
+          </form>
+          <div className="mt-4 flex items-center justify-between text-sm">
+            <button
+              className="font-semibold text-signal"
+              onClick={() => setAuthMode((current) => (current === "login" ? "register" : "login"))}
+              type="button"
+            >
+              {authMode === "login" ? "Create account" : "Use existing account"}
+            </button>
+            <span className="text-slate-500">Demo password is prefilled</span>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#f6f8fb] text-[#172033]">
       <section className="border-b border-slate-200 bg-white">
@@ -188,6 +287,13 @@ export function ProjectDashboard() {
           <button className="inline-flex w-fit items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white shadow-sm">
             <CloudUpload size={18} />
             Upload IaC
+          </button>
+          <button
+            className="inline-flex w-fit items-center rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-ink"
+            onClick={handleLogout}
+            type="button"
+          >
+            Sign out
           </button>
         </div>
       </section>

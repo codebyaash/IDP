@@ -52,6 +52,13 @@ uvicorn app.main:app --reload
 
 The backend creates a local `deployforge.db` SQLite database on startup and seeds a demo Azure project.
 
+Demo credentials:
+
+```text
+Email: demo@deployforge.local
+Password: deployforge123
+```
+
 Frontend:
 
 ```bash

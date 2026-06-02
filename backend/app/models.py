@@ -15,6 +15,7 @@ class Project(Base):
     __tablename__ = "projects"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     cloud_provider: Mapped[str] = mapped_column(String(40), nullable=False, default="azure")
     environment: Mapped[str] = mapped_column(String(40), nullable=False, default="dev")
@@ -22,6 +23,7 @@ class Project(Base):
     monthly_cost: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
+    user: Mapped["User"] = relationship(back_populates="projects")
     templates: Mapped[list["IacTemplate"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     deployments: Mapped[list["DeploymentRecord"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     resources: Mapped[list["ResourceRecord"]] = relationship(back_populates="project", cascade="all, delete-orphan")
@@ -73,3 +75,14 @@ class ResourceRecord(Base):
 
     project: Mapped[Project] = relationship(back_populates="resources")
     deployment: Mapped[DeploymentRecord] = relationship(back_populates="resources")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    projects: Mapped[list[Project]] = relationship(back_populates="user", cascade="all, delete-orphan")

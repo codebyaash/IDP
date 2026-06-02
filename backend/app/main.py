@@ -2,19 +2,34 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 
 from app.api.routes import router
 from app.core.database import Base, SessionLocal, engine
 from app import models
-from app.services.projects import seed_demo_project
+from app.services.projects import seed_demo_user_and_project
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    ensure_local_schema()
     with SessionLocal() as db:
-        seed_demo_project(db)
+        seed_demo_user_and_project(db)
     yield
+
+
+def ensure_local_schema() -> None:
+    inspector = inspect(engine)
+    if "projects" not in inspector.get_table_names():
+        return
+
+    project_columns = {column["name"] for column in inspector.get_columns("projects")}
+    if "user_id" in project_columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR"))
 
 
 app = FastAPI(

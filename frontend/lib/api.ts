@@ -16,6 +16,15 @@ export type ProjectCreate = {
   environment: string;
 };
 
+export type AuthResponse = {
+  access_token: string;
+  token_type: string;
+  user: {
+    id: string;
+    email: string;
+  };
+};
+
 export type TemplateUploadResult = {
   template: {
     id: string;
@@ -97,18 +106,49 @@ export type CostEstimate = {
   }>;
 };
 
-export async function fetchProjects(): Promise<Project[]> {
-  const response = await fetch(`${API_BASE_URL}/api/projects`, { cache: "no-store" });
+function authHeaders(token: string): HeadersInit {
+  return { Authorization: `Bearer ${token}` };
+}
+
+export async function login(email: string, password: string): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!response.ok) {
+    throw new Error("Unable to log in.");
+  }
+  return response.json();
+}
+
+export async function register(email: string, password: string): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!response.ok) {
+    throw new Error("Unable to register.");
+  }
+  return response.json();
+}
+
+export async function fetchProjects(token: string): Promise<Project[]> {
+  const response = await fetch(`${API_BASE_URL}/api/projects`, {
+    cache: "no-store",
+    headers: authHeaders(token),
+  });
   if (!response.ok) {
     throw new Error("Unable to load projects.");
   }
   return response.json();
 }
 
-export async function createProject(payload: ProjectCreate): Promise<Project> {
+export async function createProject(payload: ProjectCreate, token: string): Promise<Project> {
   const response = await fetch(`${API_BASE_URL}/api/projects`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
@@ -117,12 +157,13 @@ export async function createProject(payload: ProjectCreate): Promise<Project> {
   return response.json();
 }
 
-export async function uploadTemplate(projectId: string, file: File): Promise<TemplateUploadResult> {
+export async function uploadTemplate(projectId: string, file: File, token: string): Promise<TemplateUploadResult> {
   const formData = new FormData();
   formData.append("file", file);
 
   const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/templates/upload`, {
     method: "POST",
+    headers: authHeaders(token),
     body: formData,
   });
   if (!response.ok) {
@@ -131,9 +172,10 @@ export async function uploadTemplate(projectId: string, file: File): Promise<Tem
   return response.json();
 }
 
-export async function planTemplate(templateId: string): Promise<DeploymentPlan> {
+export async function planTemplate(templateId: string, token: string): Promise<DeploymentPlan> {
   const response = await fetch(`${API_BASE_URL}/api/templates/${templateId}/plan`, {
     method: "POST",
+    headers: authHeaders(token),
   });
   if (!response.ok) {
     throw new Error("Unable to generate deployment plan.");
@@ -141,9 +183,10 @@ export async function planTemplate(templateId: string): Promise<DeploymentPlan> 
   return response.json();
 }
 
-export async function deployTemplate(templateId: string): Promise<Deployment> {
+export async function deployTemplate(templateId: string, token: string): Promise<Deployment> {
   const response = await fetch(`${API_BASE_URL}/api/templates/${templateId}/deploy`, {
     method: "POST",
+    headers: authHeaders(token),
   });
   if (!response.ok) {
     throw new Error("Unable to run deployment.");
@@ -151,24 +194,33 @@ export async function deployTemplate(templateId: string): Promise<Deployment> {
   return response.json();
 }
 
-export async function fetchDeployments(projectId: string): Promise<Deployment[]> {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/deployments`, { cache: "no-store" });
+export async function fetchDeployments(projectId: string, token: string): Promise<Deployment[]> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/deployments`, {
+    cache: "no-store",
+    headers: authHeaders(token),
+  });
   if (!response.ok) {
     throw new Error("Unable to load deployments.");
   }
   return response.json();
 }
 
-export async function fetchResources(projectId: string): Promise<PersistedResource[]> {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/resources`, { cache: "no-store" });
+export async function fetchResources(projectId: string, token: string): Promise<PersistedResource[]> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/resources`, {
+    cache: "no-store",
+    headers: authHeaders(token),
+  });
   if (!response.ok) {
     throw new Error("Unable to load resources.");
   }
   return response.json();
 }
 
-export async function fetchCostEstimate(projectId: string): Promise<CostEstimate> {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/cost-estimate`, { cache: "no-store" });
+export async function fetchCostEstimate(projectId: string, token: string): Promise<CostEstimate> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/cost-estimate`, {
+    cache: "no-store",
+    headers: authHeaders(token),
+  });
   if (!response.ok) {
     throw new Error("Unable to load cost estimate.");
   }

@@ -17,6 +17,7 @@ class ProjectRead(ProjectBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    user_id: str
     status: str
     monthly_cost: float
     created_at: datetime

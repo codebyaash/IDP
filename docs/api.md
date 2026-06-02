@@ -4,6 +4,8 @@ Initial API surface:
 
 ```text
 GET    /health
+POST   /api/auth/register
+POST   /api/auth/login
 GET    /api/projects
 POST   /api/projects
 GET    /api/projects/{project_id}
@@ -20,28 +22,16 @@ POST   /api/templates/{template_id}/deploy
 POST   /api/templates/deploy
 ```
 
+Project, template, deployment, resource, and cost endpoints require:
+
+```text
+Authorization: Bearer <access_token>
+```
+
 Planned API surface:
 
 ```text
-POST   /auth/register
-POST   /auth/login
-
-GET    /projects
-POST   /projects
-GET    /projects/{id}
-
-POST   /projects/{id}/templates/upload
-GET    /projects/{id}/templates
-
-POST   /templates/{id}/validate
-POST   /templates/{id}/plan
-POST   /templates/{id}/deploy
-
-GET    /deployments/{id}
-GET    /projects/{id}/deployments
 POST   /deployments/{id}/rollback
 
-GET    /projects/{id}/resources
-GET    /projects/{id}/cost-estimate
 GET    /projects/{id}/policy-checks
 ```
