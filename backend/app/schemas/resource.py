@@ -5,6 +5,7 @@ class PersistedResource(BaseModel):
     id: str
     deployment_id: str
     project_id: str
+    environment: str
     resource_name: str
     resource_type: str
     provider: str
@@ -22,6 +23,7 @@ class CostBreakdownItem(BaseModel):
 
 class CostEstimate(BaseModel):
     project_id: str
+    environment: str = "dev"
     total_monthly_cost: float
     resource_count: int
     breakdown: list[CostBreakdownItem]

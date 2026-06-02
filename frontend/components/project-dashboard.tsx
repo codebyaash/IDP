@@ -41,6 +41,7 @@ const pipeline = ["Queued", "Validating", "Planning", "Deploying", "Success"];
 const TOKEN_STORAGE_KEY = "deployforge_token";
 const DEMO_EMAIL = "demo@deployforge.local";
 const DEMO_PASSWORD = "deployforge123";
+const deploymentEnvironments = ["dev", "stage", "prod"];
 
 export function ProjectDashboard() {
   const [projects, setProjects] = useState<Project[]>(fallbackProjects);
@@ -51,6 +52,7 @@ export function ProjectDashboard() {
   const [selectedProjectId, setSelectedProjectId] = useState(fallbackProjects[0].id);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [deploymentEnvironment, setDeploymentEnvironment] = useState("dev");
   const [uploadResult, setUploadResult] = useState<TemplateUploadResult | null>(null);
   const [deploymentPlan, setDeploymentPlan] = useState<DeploymentPlan | null>(null);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
@@ -100,7 +102,7 @@ export function ProjectDashboard() {
       return;
     }
 
-    fetchDeployments(selectedProjectId, token)
+    fetchDeployments(selectedProjectId, token, deploymentEnvironment)
       .then((data) => {
         setDeployments(data);
         setLatestDeployment(data[0] ?? null);
@@ -109,7 +111,7 @@ export function ProjectDashboard() {
         setDeployments([]);
       });
 
-    fetchResources(selectedProjectId, token)
+    fetchResources(selectedProjectId, token, deploymentEnvironment)
       .then((data) => {
         setResources(data);
       })
@@ -117,14 +119,14 @@ export function ProjectDashboard() {
         setResources([]);
       });
 
-    fetchCostEstimate(selectedProjectId, token)
+    fetchCostEstimate(selectedProjectId, token, deploymentEnvironment)
       .then((data) => {
         setCostEstimate(data);
       })
       .catch(() => {
         setCostEstimate(null);
       });
-  }, [selectedProjectId, token]);
+  }, [deploymentEnvironment, selectedProjectId, token]);
 
   const totalCost = useMemo(() => projects.reduce((sum, project) => sum + project.monthly_cost, 0), [projects]);
   const deploymentCount = projects.length * 7;
@@ -203,7 +205,7 @@ export function ProjectDashboard() {
 
     setIsUploading(true);
     try {
-      const result = await uploadTemplate(selectedProjectId, selectedFile, token);
+      const result = await uploadTemplate(selectedProjectId, selectedFile, token, deploymentEnvironment);
       const plan = await planTemplate(result.template.id, token);
       setUploadResult(result);
       setDeploymentPlan(plan);
@@ -225,8 +227,8 @@ export function ProjectDashboard() {
     try {
       const deployment = await deployTemplate(uploadResult.template.id, token);
       const [nextResources, nextCostEstimate] = await Promise.all([
-        fetchResources(deployment.project_id, token),
-        fetchCostEstimate(deployment.project_id, token),
+        fetchResources(deployment.project_id, token, deployment.environment),
+        fetchCostEstimate(deployment.project_id, token, deployment.environment),
       ]);
       setLatestDeployment(deployment);
       setDeployments((current) => [deployment, ...current.filter((item) => item.id !== deployment.id)]);
@@ -257,9 +259,9 @@ export function ProjectDashboard() {
       const result = await rollbackDeployment(deploymentId, token, "Rollback from dashboard");
       const restoredDeployment = result.rollback_deployment;
       const [nextResources, nextCostEstimate, nextDeployments] = await Promise.all([
-        fetchResources(restoredDeployment.project_id, token),
-        fetchCostEstimate(restoredDeployment.project_id, token),
-        fetchDeployments(restoredDeployment.project_id, token),
+        fetchResources(restoredDeployment.project_id, token, restoredDeployment.environment),
+        fetchCostEstimate(restoredDeployment.project_id, token, restoredDeployment.environment),
+        fetchDeployments(restoredDeployment.project_id, token, restoredDeployment.environment),
       ]);
       setLatestDeployment(restoredDeployment);
       setDeployments(nextDeployments);
@@ -306,6 +308,14 @@ export function ProjectDashboard() {
     setCostEstimate(null);
     setDeploymentPlan(null);
     setUploadResult(null);
+    setDeploymentEnvironment("dev");
+  }
+
+  function handleDeploymentEnvironmentChange(nextEnvironment: string) {
+    setDeploymentEnvironment(nextEnvironment);
+    setDeploymentPlan(null);
+    setUploadResult(null);
+    setSelectedFile(null);
   }
 
   if (!token) {
@@ -381,7 +391,7 @@ export function ProjectDashboard() {
             {[
               ["Success rate", "96%", "Last 30 days"],
               ["Projects tracked", String(projects.length), isLoading ? "Loading API data" : "Stored locally"],
-              ["Estimated spend", `$${totalCost}/mo`, "Backed by saved deployments"],
+              ["Estimated spend", `$${totalCost}/mo`, `${deploymentEnvironment} environment`],
             ].map(([label, value, detail]) => (
               <article key={label} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-sm text-slate-500">{label}</p>
@@ -449,7 +459,7 @@ export function ProjectDashboard() {
                 <p className="text-sm text-slate-500">Store a Terraform, YAML, JSON, or Bicep template for a project</p>
               </div>
             </div>
-            <form className="grid gap-4 px-5 py-5 lg:grid-cols-[180px_1fr_auto]" onSubmit={handleUploadTemplate}>
+            <form className="grid gap-4 px-5 py-5 lg:grid-cols-[180px_130px_1fr_auto]" onSubmit={handleUploadTemplate}>
               <select
                 className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-signal"
                 onChange={(event) => setSelectedProjectId(event.target.value)}
@@ -458,6 +468,17 @@ export function ProjectDashboard() {
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-signal"
+                onChange={(event) => handleDeploymentEnvironmentChange(event.target.value)}
+                value={deploymentEnvironment}
+              >
+                {deploymentEnvironments.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
                   </option>
                 ))}
               </select>
@@ -480,7 +501,8 @@ export function ProjectDashboard() {
               <div className="border-t border-slate-100 px-5 py-4 text-sm text-slate-600">
                 Saved <span className="font-semibold text-[#172033]">{uploadResult.template.file_name}</span> as version{" "}
                 <span className="font-semibold text-[#172033]">{uploadResult.template.version}</span> with{" "}
-                <span className="font-semibold text-[#172033]">{uploadResult.resources.length}</span> parsed resources.
+                <span className="font-semibold text-[#172033]">{uploadResult.resources.length}</span> parsed resources for{" "}
+                <span className="font-semibold text-[#172033]">{uploadResult.template.environment}</span>.
               </div>
             ) : null}
           </section>
@@ -492,7 +514,9 @@ export function ProjectDashboard() {
                   <ListChecks className="text-signal" size={20} />
                   <div>
                     <h2 className="text-lg font-semibold">Deployment Plan</h2>
-                    <p className="text-sm text-slate-500">{deploymentPlan.template_name}</p>
+                    <p className="text-sm text-slate-500">
+                      {deploymentPlan.template_name} / {deploymentPlan.environment}
+                    </p>
                   </div>
                 </div>
                 <div className="grid grid-cols-4 gap-3 text-center text-sm">
@@ -591,7 +615,9 @@ export function ProjectDashboard() {
                   <Activity className="text-signal" size={20} />
                   <div>
                     <h2 className="text-lg font-semibold">Latest Deployment</h2>
-                    <p className="text-sm text-slate-500">{latestDeployment.plan.template_name}</p>
+                    <p className="text-sm text-slate-500">
+                      {latestDeployment.plan.template_name} / {latestDeployment.environment}
+                    </p>
                   </div>
                 </div>
                 <span className="rounded-md bg-emerald-50 px-2 py-1 text-sm font-semibold capitalize text-emerald-700">
@@ -639,7 +665,9 @@ export function ProjectDashboard() {
                     <span className="text-xs font-semibold capitalize text-signal">{deployment.status}</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-3">
-                    <p className="text-xs text-slate-500">${deployment.plan.estimated_monthly_cost}/mo</p>
+                    <p className="text-xs text-slate-500">
+                      ${deployment.plan.estimated_monthly_cost}/mo / {deployment.environment}
+                    </p>
                     <button
                       className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={rollbackDeploymentId === deployment.id}
@@ -689,7 +717,7 @@ export function ProjectDashboard() {
               <>
                 <div className="mt-4 flex items-end justify-between">
                   <div>
-                    <p className="text-sm text-slate-500">Current deployed monthly cost</p>
+                    <p className="text-sm text-slate-500">Current deployed monthly cost / {deploymentEnvironment}</p>
                     <p className="text-3xl font-semibold">${costEstimate.total_monthly_cost}</p>
                   </div>
                   <p className="text-sm text-slate-500">{costEstimate.resource_count} resources</p>

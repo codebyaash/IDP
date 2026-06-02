@@ -175,6 +175,7 @@ resources:
     assert deployment.status_code == 201
     payload = deployment.json()
     assert payload["status"] == "success"
+    assert payload["environment"] == "dev"
     assert payload["plan"]["summary"]["create"] == 2
     assert len(payload["steps"]) == 5
 
@@ -336,3 +337,84 @@ resources:
     rule_ids = {violation["rule_id"] for violation in plan.json()["policy_violations"]}
     assert "POLICY_PUBLIC_RESOURCE" in rule_ids
     assert "POLICY_EXPENSIVE_RESOURCE" in rule_ids
+
+
+def test_deployments_are_isolated_by_environment(client: TestClient, auth_headers: dict[str, str]) -> None:
+    stage_template = """
+resources:
+  - name: rg-stage-env
+    type: resource_group
+    provider: azure
+    region: eastus
+  - name: ststageenv001
+    type: storage_account
+    provider: azure
+    region: eastus
+    dependencies:
+      - rg-stage-env
+"""
+    dev_template = """
+resources:
+  - name: rg-dev-env
+    type: resource_group
+    provider: azure
+    region: eastus
+"""
+
+    stage_upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        data={"environment": "stage"},
+        files={"file": ("stage-env.yaml", stage_template, "text/yaml")},
+        headers=auth_headers,
+    )
+    stage_template_id = stage_upload.json()["template"]["id"]
+    stage_plan = client.post(f"/api/templates/{stage_template_id}/plan", headers=auth_headers).json()
+    stage_deployment = client.post(f"/api/templates/{stage_template_id}/deploy", headers=auth_headers).json()
+
+    assert stage_upload.status_code == 201
+    assert stage_upload.json()["template"]["environment"] == "stage"
+    assert stage_upload.json()["template"]["version"] == 1
+    assert stage_plan["environment"] == "stage"
+    assert stage_plan["summary"]["create"] == 2
+    assert stage_deployment["environment"] == "stage"
+
+    dev_resources = client.get(
+        "/api/projects/demo-azure-core/resources?environment=dev",
+        headers=auth_headers,
+    ).json()
+    stage_resources = client.get(
+        "/api/projects/demo-azure-core/resources?environment=stage",
+        headers=auth_headers,
+    ).json()
+
+    assert dev_resources == []
+    assert {resource["resource_name"] for resource in stage_resources} == {"rg-stage-env", "ststageenv001"}
+    assert all(resource["environment"] == "stage" for resource in stage_resources)
+
+    dev_upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        data={"environment": "dev"},
+        files={"file": ("dev-env.yaml", dev_template, "text/yaml")},
+        headers=auth_headers,
+    )
+    dev_deployment = client.post(f"/api/templates/{dev_upload.json()['template']['id']}/deploy", headers=auth_headers)
+    stage_history = client.get(
+        "/api/projects/demo-azure-core/deployments?environment=stage",
+        headers=auth_headers,
+    ).json()
+    dev_cost = client.get(
+        "/api/projects/demo-azure-core/cost-estimate?environment=dev",
+        headers=auth_headers,
+    ).json()
+    stage_cost = client.get(
+        "/api/projects/demo-azure-core/cost-estimate?environment=stage",
+        headers=auth_headers,
+    ).json()
+
+    assert dev_upload.json()["template"]["version"] == 1
+    assert dev_deployment.status_code == 201
+    assert len(stage_history) == 1
+    assert dev_cost["environment"] == "dev"
+    assert dev_cost["total_monthly_cost"] == 0
+    assert stage_cost["environment"] == "stage"
+    assert stage_cost["total_monthly_cost"] == 12

@@ -35,6 +35,7 @@ class IacTemplate(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    environment: Mapped[str] = mapped_column(String(40), nullable=False, default="dev")
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_type: Mapped[str] = mapped_column(String(40), nullable=False)
     raw_content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -50,6 +51,7 @@ class DeploymentRecord(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    environment: Mapped[str] = mapped_column(String(40), nullable=False, default="dev")
     status: Mapped[str] = mapped_column(String(40), nullable=False)
     template_name: Mapped[str] = mapped_column(String(255), nullable=False)
     plan_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
@@ -66,6 +68,7 @@ class ResourceRecord(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
     deployment_id: Mapped[str] = mapped_column(ForeignKey("deployments.id"), nullable=False)
+    environment: Mapped[str] = mapped_column(String(40), nullable=False, default="dev")
     resource_name: Mapped[str] = mapped_column(String(255), nullable=False)
     resource_type: Mapped[str] = mapped_column(String(255), nullable=False)
     provider: Mapped[str] = mapped_column(String(80), nullable=False, default="azure")
@@ -84,6 +87,7 @@ class RollbackEvent(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    environment: Mapped[str] = mapped_column(String(40), nullable=False, default="dev")
     source_deployment_id: Mapped[str] = mapped_column(ForeignKey("deployments.id"), nullable=False)
     rollback_deployment_id: Mapped[str] = mapped_column(ForeignKey("deployments.id"), nullable=False)
     reason: Mapped[str] = mapped_column(String(255), nullable=False, default="Manual rollback")

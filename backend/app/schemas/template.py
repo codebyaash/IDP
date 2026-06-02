@@ -11,6 +11,7 @@ class TemplateRead(BaseModel):
 
     id: str
     project_id: str
+    environment: str
     file_name: str
     file_type: str
     version: int

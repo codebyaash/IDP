@@ -23,6 +23,7 @@ def deploy_template(db: Session, template_id: str) -> Optional[Deployment]:
     record = DeploymentRecord(
         id=deployment.id,
         project_id=template.project_id,
+        environment=template.environment,
         status=deployment.status,
         template_name=template.file_name,
         plan_json={
@@ -46,10 +47,10 @@ def deploy_template(db: Session, template_id: str) -> Optional[Deployment]:
     return _deployment_from_record(record)
 
 
-def list_deployments(db: Session, project_id: str) -> list[Deployment]:
+def list_deployments(db: Session, project_id: str, environment: str = "dev") -> list[Deployment]:
     statement = (
         select(DeploymentRecord)
-        .where(DeploymentRecord.project_id == project_id)
+        .where(DeploymentRecord.project_id == project_id, DeploymentRecord.environment == environment)
         .order_by(DeploymentRecord.created_at.desc())
     )
     return [_deployment_from_record(record) for record in db.scalars(statement)]
@@ -71,10 +72,11 @@ def rollback_deployment(db: Session, deployment_id: str, reason: str = "Manual r
     if not resources:
         resources = _resources_from_record_plan(source)
 
-    plan = _rollback_plan(source.template_name, resources)
+    plan = _rollback_plan(source.template_name, resources, source.environment)
     steps = _rollback_steps(source.id, len(resources))
     record = DeploymentRecord(
         project_id=source.project_id,
+        environment=source.environment,
         status="success",
         template_name=f"Rollback to {source.template_name}",
         plan_json={
@@ -97,6 +99,7 @@ def rollback_deployment(db: Session, deployment_id: str, reason: str = "Manual r
     db.add(
         RollbackEvent(
             project_id=source.project_id,
+            environment=source.environment,
             source_deployment_id=source.id,
             rollback_deployment_id=record.id,
             reason=reason,
@@ -118,6 +121,7 @@ def _deployment_from_record(record: DeploymentRecord) -> Deployment:
     return Deployment(
         id=record.id,
         project_id=record.project_id,
+        environment=record.environment,
         status=record.status,
         plan=plan,
         steps=steps,
@@ -134,7 +138,7 @@ def _resources_from_record_plan(record: DeploymentRecord) -> list[Resource]:
     return [change.resource for change in plan.changes]
 
 
-def _rollback_plan(template_name: str, resources: list[Resource]) -> DeploymentPlan:
+def _rollback_plan(template_name: str, resources: list[Resource], environment: str = "dev") -> DeploymentPlan:
     changes = [
         PlanChange(
             action="rollback",
@@ -145,6 +149,7 @@ def _rollback_plan(template_name: str, resources: list[Resource]) -> DeploymentP
     ]
     return DeploymentPlan(
         template_name=f"Rollback to {template_name}",
+        environment=environment,
         summary={"create": 0, "update": len(resources), "delete": 0, "rollback": len(resources)},
         changes=changes,
         estimated_monthly_cost=sum(resource.estimated_monthly_cost for resource in resources),

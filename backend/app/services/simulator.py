@@ -78,7 +78,11 @@ def validate_template(file_name: str, content: str) -> TemplateValidation:
     )
 
 
-def generate_plan(template: ParsedTemplate, current_resources: Optional[list[Resource]] = None) -> DeploymentPlan:
+def generate_plan(
+    template: ParsedTemplate,
+    current_resources: Optional[list[Resource]] = None,
+    environment: str = "dev",
+) -> DeploymentPlan:
     current_by_name = {resource.name: resource for resource in current_resources or []}
     desired_by_name = {resource.name: resource for resource in template.resources}
     changes: list[PlanChange] = []
@@ -125,6 +129,7 @@ def generate_plan(template: ParsedTemplate, current_resources: Optional[list[Res
     }
     return DeploymentPlan(
         template_name=template.file_name,
+        environment=environment,
         summary=summary,
         changes=changes,
         estimated_monthly_cost=total_cost,
@@ -150,6 +155,7 @@ def create_deployment(plan: DeploymentPlan, project_id: str = "demo-azure-core")
     return Deployment(
         id=str(uuid.uuid4()),
         project_id=project_id,
+        environment=plan.environment,
         status="success",
         plan=plan,
         steps=steps,
@@ -160,6 +166,7 @@ def list_sample_deployments(project_id: str) -> list[Deployment]:
     resource = _build_resource("core-vnet", "azurerm_virtual_network", region="eastus")
     plan = DeploymentPlan(
         template_name="azure-network.tf",
+        environment="dev",
         summary={"create": 1, "update": 0, "delete": 0},
         changes=[PlanChange(action="create", resource=resource, reason="Initial baseline deployment.")],
         estimated_monthly_cost=resource.estimated_monthly_cost,

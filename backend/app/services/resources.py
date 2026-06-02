@@ -16,6 +16,7 @@ def persist_resources_for_deployment(db: Session, deployment: DeploymentRecord, 
             ResourceRecord(
                 project_id=deployment.project_id,
                 deployment_id=deployment.id,
+                environment=deployment.environment,
                 resource_name=resource.name,
                 resource_type=resource.type,
                 provider=resource.provider,
@@ -37,6 +38,7 @@ def persist_resource_snapshot(
             ResourceRecord(
                 project_id=deployment.project_id,
                 deployment_id=deployment.id,
+                environment=deployment.environment,
                 resource_name=resource.name,
                 resource_type=resource.type,
                 provider=resource.provider,
@@ -68,15 +70,15 @@ def get_deployment_resource_snapshot(db: Session, deployment_id: str) -> list[Re
     ]
 
 
-def get_latest_project_resource_snapshot(db: Session, project_id: str) -> list[Resource]:
-    deployment = _latest_deployment(db, project_id)
+def get_latest_project_resource_snapshot(db: Session, project_id: str, environment: str = "dev") -> list[Resource]:
+    deployment = _latest_deployment(db, project_id, environment)
     if deployment is None:
         return []
     return get_deployment_resource_snapshot(db, deployment.id)
 
 
-def list_project_resources(db: Session, project_id: str) -> list[PersistedResource]:
-    deployment = _latest_deployment(db, project_id)
+def list_project_resources(db: Session, project_id: str, environment: str = "dev") -> list[PersistedResource]:
+    deployment = _latest_deployment(db, project_id, environment)
     if deployment is None:
         return []
 
@@ -88,8 +90,8 @@ def list_project_resources(db: Session, project_id: str) -> list[PersistedResour
     return [PersistedResource.model_validate(resource, from_attributes=True) for resource in db.scalars(statement)]
 
 
-def get_project_cost_estimate(db: Session, project_id: str) -> CostEstimate:
-    resources = list_project_resources(db, project_id)
+def get_project_cost_estimate(db: Session, project_id: str, environment: str = "dev") -> CostEstimate:
+    resources = list_project_resources(db, project_id, environment)
     breakdown: dict[str, list[float]] = defaultdict(list)
 
     for resource in resources:
@@ -107,16 +109,17 @@ def get_project_cost_estimate(db: Session, project_id: str) -> CostEstimate:
 
     return CostEstimate(
         project_id=project_id,
+        environment=environment,
         total_monthly_cost=total_monthly_cost,
         resource_count=len(resources),
         breakdown=items,
     )
 
 
-def _latest_deployment(db: Session, project_id: str) -> Optional[DeploymentRecord]:
+def _latest_deployment(db: Session, project_id: str, environment: str = "dev") -> Optional[DeploymentRecord]:
     statement = (
         select(DeploymentRecord)
-        .where(DeploymentRecord.project_id == project_id)
+        .where(DeploymentRecord.project_id == project_id, DeploymentRecord.environment == environment)
         .order_by(DeploymentRecord.created_at.desc())
         .limit(1)
     )

@@ -29,6 +29,7 @@ export type TemplateUploadResult = {
   template: {
     id: string;
     project_id: string;
+    environment: string;
     file_name: string;
     file_type: string;
     version: number;
@@ -57,6 +58,7 @@ export type Resource = {
 
 export type DeploymentPlan = {
   template_name: string;
+  environment: string;
   summary: Record<string, number>;
   changes: Array<{
     action: string;
@@ -83,6 +85,7 @@ export type DeploymentPlan = {
 export type Deployment = {
   id: string;
   project_id: string;
+  environment: string;
   status: string;
   plan: DeploymentPlan;
   steps: Array<{
@@ -103,6 +106,7 @@ export type PersistedResource = {
   id: string;
   deployment_id: string;
   project_id: string;
+  environment: string;
   resource_name: string;
   resource_type: string;
   provider: string;
@@ -114,6 +118,7 @@ export type PersistedResource = {
 
 export type CostEstimate = {
   project_id: string;
+  environment: string;
   total_monthly_cost: number;
   resource_count: number;
   breakdown: Array<{
@@ -174,8 +179,14 @@ export async function createProject(payload: ProjectCreate, token: string): Prom
   return response.json();
 }
 
-export async function uploadTemplate(projectId: string, file: File, token: string): Promise<TemplateUploadResult> {
+export async function uploadTemplate(
+  projectId: string,
+  file: File,
+  token: string,
+  environment = "dev",
+): Promise<TemplateUploadResult> {
   const formData = new FormData();
+  formData.append("environment", environment);
   formData.append("file", file);
 
   const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/templates/upload`, {
@@ -211,8 +222,8 @@ export async function deployTemplate(templateId: string, token: string): Promise
   return response.json();
 }
 
-export async function fetchDeployments(projectId: string, token: string): Promise<Deployment[]> {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/deployments`, {
+export async function fetchDeployments(projectId: string, token: string, environment = "dev"): Promise<Deployment[]> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/deployments?environment=${environment}`, {
     cache: "no-store",
     headers: authHeaders(token),
   });
@@ -222,8 +233,8 @@ export async function fetchDeployments(projectId: string, token: string): Promis
   return response.json();
 }
 
-export async function fetchResources(projectId: string, token: string): Promise<PersistedResource[]> {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/resources`, {
+export async function fetchResources(projectId: string, token: string, environment = "dev"): Promise<PersistedResource[]> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/resources?environment=${environment}`, {
     cache: "no-store",
     headers: authHeaders(token),
   });
@@ -233,8 +244,8 @@ export async function fetchResources(projectId: string, token: string): Promise<
   return response.json();
 }
 
-export async function fetchCostEstimate(projectId: string, token: string): Promise<CostEstimate> {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/cost-estimate`, {
+export async function fetchCostEstimate(projectId: string, token: string, environment = "dev"): Promise<CostEstimate> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/cost-estimate?environment=${environment}`, {
     cache: "no-store",
     headers: authHeaders(token),
   });

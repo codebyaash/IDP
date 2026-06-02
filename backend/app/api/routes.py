@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
@@ -73,12 +73,13 @@ def get_project_by_id(
 @router.get("/projects/{project_id}/deployments")
 def get_project_deployments(
     project_id: str,
+    environment: str = Query("dev"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[Deployment]:
     if get_project(db, project_id, current_user.id) is None:
         raise HTTPException(status_code=404, detail="Project not found.")
-    return list_deployments(db, project_id)
+    return list_deployments(db, project_id, environment)
 
 
 @router.get("/deployments/{deployment_id}", response_model=Deployment)
@@ -113,39 +114,43 @@ def rollback_deployment_by_id(
 @router.get("/projects/{project_id}/templates", response_model=list[TemplateRead])
 def get_project_templates(
     project_id: str,
+    environment: str = Query("dev"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[TemplateRead]:
     if get_project(db, project_id, current_user.id) is None:
         raise HTTPException(status_code=404, detail="Project not found.")
-    return list_templates(db, project_id)
+    return list_templates(db, project_id, environment)
 
 
 @router.get("/projects/{project_id}/resources", response_model=list[PersistedResource])
 def get_project_resources(
     project_id: str,
+    environment: str = Query("dev"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[PersistedResource]:
     if get_project(db, project_id, current_user.id) is None:
         raise HTTPException(status_code=404, detail="Project not found.")
-    return list_project_resources(db, project_id)
+    return list_project_resources(db, project_id, environment)
 
 
 @router.get("/projects/{project_id}/cost-estimate", response_model=CostEstimate)
 def get_project_cost(
     project_id: str,
+    environment: str = Query("dev"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> CostEstimate:
     if get_project(db, project_id, current_user.id) is None:
         raise HTTPException(status_code=404, detail="Project not found.")
-    return get_project_cost_estimate(db, project_id)
+    return get_project_cost_estimate(db, project_id, environment)
 
 
 @router.post("/projects/{project_id}/templates/upload", response_model=TemplateUploadResult, status_code=201)
 async def upload_project_template(
     project_id: str,
+    environment: str = Form("dev"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -158,7 +163,7 @@ async def upload_project_template(
     if not parsed.resources:
         raise HTTPException(status_code=422, detail="No resources found in template.")
 
-    template = create_template(db, project_id=project_id, raw_content=content, parsed=parsed)
+    template = create_template(db, project_id=project_id, raw_content=content, parsed=parsed, environment=environment)
     return TemplateUploadResult(template=template, resources=parsed.resources, warnings=[])
 
 

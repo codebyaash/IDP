@@ -51,6 +51,7 @@ class PolicyViolation(BaseModel):
 
 class DeploymentPlan(BaseModel):
     template_name: str
+    environment: str = "dev"
     summary: dict[str, int]
     changes: list[PlanChange]
     estimated_monthly_cost: float
@@ -69,6 +70,7 @@ class DeploymentStep(BaseModel):
 class Deployment(BaseModel):
     id: str
     project_id: str
+    environment: str = "dev"
     status: str
     plan: DeploymentPlan
     steps: list[DeploymentStep]
