@@ -200,3 +200,66 @@ resources:
     assert cost_payload["total_monthly_cost"] == 12
     assert cost_payload["resource_count"] == 2
     assert any(item["label"] == "storage_account" for item in cost_payload["breakdown"])
+
+
+def test_rollback_restores_previous_deployment_resources(client: TestClient, auth_headers: dict[str, str]) -> None:
+    first_template = """
+resources:
+  - name: rg-rollback-test
+    type: resource_group
+    provider: azure
+    region: eastus
+  - name: strollback001
+    type: storage_account
+    provider: azure
+    region: eastus
+"""
+    second_template = """
+resources:
+  - name: rg-rollback-test
+    type: resource_group
+    provider: azure
+    region: eastus
+  - name: vm-rollback-test
+    type: vm
+    provider: azure
+    region: eastus
+"""
+
+    first_upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        files={"file": ("rollback-one.yaml", first_template, "text/yaml")},
+        headers=auth_headers,
+    )
+    first_deployment = client.post(
+        f"/api/templates/{first_upload.json()['template']['id']}/deploy",
+        headers=auth_headers,
+    ).json()
+
+    second_upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        files={"file": ("rollback-two.yaml", second_template, "text/yaml")},
+        headers=auth_headers,
+    )
+    client.post(f"/api/templates/{second_upload.json()['template']['id']}/deploy", headers=auth_headers)
+
+    rollback = client.post(
+        f"/api/deployments/{first_deployment['id']}/rollback",
+        json={"reason": "Return to storage baseline"},
+        headers=auth_headers,
+    )
+
+    assert rollback.status_code == 201
+    rollback_payload = rollback.json()
+    assert rollback_payload["source_deployment_id"] == first_deployment["id"]
+    assert rollback_payload["rollback_deployment"]["status"] == "success"
+    assert rollback_payload["rollback_deployment"]["plan"]["summary"]["rollback"] == 2
+
+    resources = client.get("/api/projects/demo-azure-core/resources", headers=auth_headers).json()
+    resource_names = {resource["resource_name"] for resource in resources}
+
+    assert resource_names == {"rg-rollback-test", "strollback001"}
+
+    cost = client.get("/api/projects/demo-azure-core/cost-estimate", headers=auth_headers).json()
+
+    assert cost["total_monthly_cost"] == 12

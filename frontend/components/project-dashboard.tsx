@@ -14,6 +14,7 @@ import {
   login,
   planTemplate,
   register,
+  rollbackDeployment,
   type CostEstimate,
   type Deployment,
   type DeploymentPlan,
@@ -56,6 +57,7 @@ export function ProjectDashboard() {
   const [resources, setResources] = useState<PersistedResource[]>([]);
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
+  const [rollbackDeploymentId, setRollbackDeploymentId] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState(DEMO_EMAIL);
@@ -200,6 +202,39 @@ export function ProjectDashboard() {
       setError("Could not run deployment simulation for this template.");
     } finally {
       setIsDeploying(false);
+    }
+  }
+
+  async function handleRollback(deploymentId: string) {
+    if (!token) {
+      return;
+    }
+
+    setRollbackDeploymentId(deploymentId);
+    try {
+      const result = await rollbackDeployment(deploymentId, token, "Rollback from dashboard");
+      const restoredDeployment = result.rollback_deployment;
+      const [nextResources, nextCostEstimate, nextDeployments] = await Promise.all([
+        fetchResources(restoredDeployment.project_id, token),
+        fetchCostEstimate(restoredDeployment.project_id, token),
+        fetchDeployments(restoredDeployment.project_id, token),
+      ]);
+      setLatestDeployment(restoredDeployment);
+      setDeployments(nextDeployments);
+      setResources(nextResources);
+      setCostEstimate(nextCostEstimate);
+      setProjects((current) =>
+        current.map((project) =>
+          project.id === restoredDeployment.project_id
+            ? { ...project, monthly_cost: nextCostEstimate.total_monthly_cost, status: "rolled_back" }
+            : project,
+        ),
+      );
+      setError("");
+    } catch {
+      setError("Could not roll back to that deployment.");
+    } finally {
+      setRollbackDeploymentId(null);
     }
   }
 
@@ -522,7 +557,17 @@ export function ProjectDashboard() {
                     <span className="truncate text-sm font-medium">{deployment.plan.template_name}</span>
                     <span className="text-xs font-semibold capitalize text-signal">{deployment.status}</span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">${deployment.plan.estimated_monthly_cost}/mo</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className="text-xs text-slate-500">${deployment.plan.estimated_monthly_cost}/mo</p>
+                    <button
+                      className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={rollbackDeploymentId === deployment.id}
+                      onClick={() => handleRollback(deployment.id)}
+                      type="button"
+                    >
+                      Rollback
+                    </button>
+                  </div>
                 </div>
               ))}
               {deployments.length === 0 ? <p className="text-sm text-slate-500">No deployment runs yet.</p> : null}

@@ -27,6 +27,7 @@ class Project(Base):
     templates: Mapped[list["IacTemplate"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     deployments: Mapped[list["DeploymentRecord"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     resources: Mapped[list["ResourceRecord"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    rollback_events: Mapped[list["RollbackEvent"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
 class IacTemplate(Base):
@@ -75,6 +76,19 @@ class ResourceRecord(Base):
 
     project: Mapped[Project] = relationship(back_populates="resources")
     deployment: Mapped[DeploymentRecord] = relationship(back_populates="resources")
+
+
+class RollbackEvent(Base):
+    __tablename__ = "rollback_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    source_deployment_id: Mapped[str] = mapped_column(ForeignKey("deployments.id"), nullable=False)
+    rollback_deployment_id: Mapped[str] = mapped_column(ForeignKey("deployments.id"), nullable=False)
+    reason: Mapped[str] = mapped_column(String(255), nullable=False, default="Manual rollback")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    project: Mapped[Project] = relationship(back_populates="rollback_events")
 
 
 class User(Base):

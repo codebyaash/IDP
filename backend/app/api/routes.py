@@ -7,10 +7,11 @@ from app.schemas.auth import AuthCredentials, TokenResponse
 from app.schemas.deployment import Deployment, DeploymentPlan, TemplateValidation
 from app.schemas.project import ProjectCreate, ProjectRead
 from app.schemas.resource import CostEstimate, PersistedResource
+from app.schemas.rollback import RollbackRequest, RollbackResult
 from app.schemas.template import TemplateRead, TemplateUploadResult
 from app.core.database import get_db
 from app.services.auth import authenticate_user, create_user, get_user_by_email, token_for_user
-from app.services.deployments import deploy_template, get_deployment, list_deployments
+from app.services.deployments import deploy_template, get_deployment, list_deployments, rollback_deployment
 from app.services.projects import create_project, get_project, list_projects
 from app.services.resources import get_project_cost_estimate, list_project_resources
 from app.services.simulator import (
@@ -90,6 +91,23 @@ def get_deployment_by_id(
     if deployment is None or get_project(db, deployment.project_id, current_user.id) is None:
         raise HTTPException(status_code=404, detail="Deployment not found.")
     return deployment
+
+
+@router.post("/deployments/{deployment_id}/rollback", response_model=RollbackResult, status_code=201)
+def rollback_deployment_by_id(
+    deployment_id: str,
+    payload: RollbackRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> RollbackResult:
+    deployment = get_deployment(db, deployment_id)
+    if deployment is None or get_project(db, deployment.project_id, current_user.id) is None:
+        raise HTTPException(status_code=404, detail="Deployment not found.")
+
+    result = rollback_deployment(db, deployment_id, payload.reason)
+    if result is None:
+        raise HTTPException(status_code=422, detail="Deployment cannot be rolled back.")
+    return result
 
 
 @router.get("/projects/{project_id}/templates", response_model=list[TemplateRead])

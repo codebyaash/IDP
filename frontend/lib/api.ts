@@ -83,6 +83,11 @@ export type Deployment = {
   created_at: string | null;
 };
 
+export type RollbackResult = {
+  source_deployment_id: string;
+  rollback_deployment: Deployment;
+};
+
 export type PersistedResource = {
   id: string;
   deployment_id: string;
@@ -223,6 +228,22 @@ export async function fetchCostEstimate(projectId: string, token: string): Promi
   });
   if (!response.ok) {
     throw new Error("Unable to load cost estimate.");
+  }
+  return response.json();
+}
+
+export async function rollbackDeployment(
+  deploymentId: string,
+  token: string,
+  reason = "Manual rollback",
+): Promise<RollbackResult> {
+  const response = await fetch(`${API_BASE_URL}/api/deployments/${deploymentId}/rollback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ reason }),
+  });
+  if (!response.ok) {
+    throw new Error("Unable to roll back deployment.");
   }
   return response.json();
 }

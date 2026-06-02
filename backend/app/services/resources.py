@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import DeploymentRecord, ResourceRecord
-from app.schemas.deployment import DeploymentPlan
+from app.schemas.deployment import DeploymentPlan, Resource
 from app.schemas.resource import CostBreakdownItem, CostEstimate, PersistedResource
 
 
@@ -24,6 +24,45 @@ def persist_resources_for_deployment(db: Session, deployment: DeploymentRecord, 
                 estimated_monthly_cost=resource.estimated_monthly_cost,
             )
         )
+
+
+def persist_resource_snapshot(
+    db: Session,
+    deployment: DeploymentRecord,
+    resources: list[Resource],
+) -> None:
+    for resource in resources:
+        db.add(
+            ResourceRecord(
+                project_id=deployment.project_id,
+                deployment_id=deployment.id,
+                resource_name=resource.name,
+                resource_type=resource.type,
+                provider=resource.provider,
+                region=resource.region,
+                dependencies=resource.dependencies,
+                estimated_monthly_cost=resource.estimated_monthly_cost,
+            )
+        )
+
+
+def get_deployment_resource_snapshot(db: Session, deployment_id: str) -> list[Resource]:
+    statement = (
+        select(ResourceRecord)
+        .where(ResourceRecord.deployment_id == deployment_id)
+        .order_by(ResourceRecord.resource_type.asc(), ResourceRecord.resource_name.asc())
+    )
+    return [
+        Resource(
+            name=resource.resource_name,
+            type=resource.resource_type,
+            provider=resource.provider,
+            region=resource.region,
+            dependencies=resource.dependencies,
+            estimated_monthly_cost=resource.estimated_monthly_cost,
+        )
+        for resource in db.scalars(statement)
+    ]
 
 
 def list_project_resources(db: Session, project_id: str) -> list[PersistedResource]:
