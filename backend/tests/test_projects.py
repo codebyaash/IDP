@@ -1,11 +1,13 @@
 from fastapi.testclient import TestClient
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.main import app
+from app.models import Project
 from app.services.projects import DEMO_USER_EMAIL, DEMO_USER_PASSWORD, seed_demo_user_and_project
 
 
@@ -16,6 +18,7 @@ def client() -> TestClient:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    event.listen(engine, "connect", _enable_sqlite_foreign_keys)
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
 
@@ -32,6 +35,12 @@ def client() -> TestClient:
     app.dependency_overrides[get_db] = override_get_db
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+def _enable_sqlite_foreign_keys(dbapi_connection, connection_record) -> None:
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 @pytest.fixture
@@ -90,6 +99,32 @@ def test_create_project(client: TestClient, auth_headers: dict[str, str]) -> Non
     assert project["status"] == "healthy"
 
 
+def test_invalid_project_environment_is_rejected(client: TestClient, auth_headers: dict[str, str]) -> None:
+    response = client.post(
+        "/api/projects",
+        json={"name": "Invalid Env", "cloud_provider": "azure", "environment": "qa"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 422
+
+
+def test_database_rejects_orphan_project() -> None:
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    event.listen(engine, "connect", _enable_sqlite_foreign_keys)
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    Base.metadata.create_all(bind=engine)
+
+    with TestingSessionLocal() as db:
+        db.add(Project(user_id="missing-user", name="Orphan Project", cloud_provider="azure", environment="dev"))
+        with pytest.raises(IntegrityError):
+            db.commit()
+
+
 def test_upload_and_list_project_template(client: TestClient, auth_headers: dict[str, str]) -> None:
     template = """
 resource "azurerm_resource_group" "core" {
@@ -115,6 +150,17 @@ resource "azurerm_resource_group" "core" {
     assert listing.status_code == 200
     templates = listing.json()
     assert templates[0]["file_name"] == "main.tf"
+
+
+def test_invalid_template_environment_is_rejected(client: TestClient, auth_headers: dict[str, str]) -> None:
+    upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        data={"environment": "qa"},
+        files={"file": ("main.tf", 'resource "azurerm_resource_group" "core" {}', "text/plain")},
+        headers=auth_headers,
+    )
+
+    assert upload.status_code == 422
 
 
 def test_generate_plan_from_saved_template(client: TestClient, auth_headers: dict[str, str]) -> None:

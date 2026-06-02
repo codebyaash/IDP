@@ -5,7 +5,7 @@ from app.core.security import get_current_user
 from app.models import User
 from app.schemas.auth import AuthCredentials, TokenResponse
 from app.schemas.deployment import Deployment, DeploymentPlan, TemplateValidation
-from app.schemas.project import ProjectCreate, ProjectRead
+from app.schemas.project import DeploymentEnvironment, ProjectCreate, ProjectRead
 from app.schemas.resource import CostEstimate, PersistedResource
 from app.schemas.rollback import RollbackRequest, RollbackResult
 from app.schemas.template import TemplateRead, TemplateUploadResult
@@ -23,8 +23,6 @@ from app.services.simulator import (
 from app.services.templates import create_template, get_template, get_template_plan, list_templates
 
 router = APIRouter(prefix="/api")
-ENVIRONMENT_QUERY = Query("dev", description="Deployment environment to read: dev, stage, or prod.")
-ENVIRONMENT_FORM = Form("dev", description="Deployment environment to store this template under: dev, stage, or prod.")
 
 
 @router.post("/auth/register", response_model=TokenResponse, status_code=201, tags=["Auth"], summary="Register a user")
@@ -80,7 +78,7 @@ def get_project_by_id(
 )
 def get_project_deployments(
     project_id: str,
-    environment: str = ENVIRONMENT_QUERY,
+    environment: DeploymentEnvironment = Query("dev", description="Deployment environment to read: dev, stage, or prod."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[Deployment]:
@@ -132,7 +130,7 @@ def rollback_deployment_by_id(
 )
 def get_project_templates(
     project_id: str,
-    environment: str = ENVIRONMENT_QUERY,
+    environment: DeploymentEnvironment = Query("dev", description="Deployment environment to read: dev, stage, or prod."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[TemplateRead]:
@@ -149,7 +147,7 @@ def get_project_templates(
 )
 def get_project_resources(
     project_id: str,
-    environment: str = ENVIRONMENT_QUERY,
+    environment: DeploymentEnvironment = Query("dev", description="Deployment environment to read: dev, stage, or prod."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[PersistedResource]:
@@ -166,7 +164,7 @@ def get_project_resources(
 )
 def get_project_cost(
     project_id: str,
-    environment: str = ENVIRONMENT_QUERY,
+    environment: DeploymentEnvironment = Query("dev", description="Deployment environment to read: dev, stage, or prod."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> CostEstimate:
@@ -184,7 +182,10 @@ def get_project_cost(
 )
 async def upload_project_template(
     project_id: str,
-    environment: str = ENVIRONMENT_FORM,
+    environment: DeploymentEnvironment = Form(
+        "dev",
+        description="Deployment environment to store this template under: dev, stage, or prod.",
+    ),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

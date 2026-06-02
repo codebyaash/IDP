@@ -1,12 +1,15 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
+
+DeploymentEnvironment = Literal["dev", "stage", "prod"]
 
 
 class ProjectBase(BaseModel):
     name: str
     cloud_provider: str = "azure"
-    environment: str = "dev"
+    environment: DeploymentEnvironment = "dev"
 
 
 class ProjectCreate(ProjectBase):
