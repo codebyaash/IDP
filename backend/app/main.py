@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from sqlalchemy import inspect, text
 
 from app.api.routes import router
@@ -56,9 +57,33 @@ def ensure_local_schema() -> None:
 
 app = FastAPI(
     title="DeployForge API",
-    description="Simulation-first infrastructure deployment platform API.",
+    summary="Simulation-first infrastructure deployment platform API.",
+    description=(
+        "DeployForge provides portfolio-safe infrastructure workflows: upload IaC templates, "
+        "validate and plan changes, simulate environment-aware deployments, inspect resource graphs, "
+        "estimate monthly cost, and roll back to previous deployment snapshots."
+    ),
     version="0.1.0",
     lifespan=lifespan,
+    contact={
+        "name": "DeployForge Portfolio API",
+        "url": "http://localhost:3001",
+    },
+    swagger_ui_parameters={
+        "defaultModelsExpandDepth": 1,
+        "displayRequestDuration": True,
+        "docExpansion": "none",
+        "persistAuthorization": True,
+        "tryItOutEnabled": True,
+    },
+    openapi_tags=[
+        {"name": "Auth", "description": "Register, login, and issue JWT bearer tokens."},
+        {"name": "Projects", "description": "Create and list cloud infrastructure workspaces."},
+        {"name": "Templates", "description": "Upload, validate, and plan IaC templates."},
+        {"name": "Deployments", "description": "Run simulated deployment pipelines and rollback snapshots."},
+        {"name": "Resources", "description": "Inspect latest environment-scoped resources and cost estimates."},
+        {"name": "System", "description": "Health checks and API metadata."},
+    ],
 )
 
 app.add_middleware(
@@ -72,6 +97,11 @@ app.add_middleware(
 app.include_router(router)
 
 
-@app.get("/health")
+@app.get("/health", tags=["System"], summary="Check API health")
 def health_check() -> dict[str, str]:
     return {"status": "ok", "service": "deployforge-api"}
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
