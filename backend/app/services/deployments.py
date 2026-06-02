@@ -5,11 +5,7 @@ from typing import Optional
 from app.models import DeploymentRecord, Project, RollbackEvent
 from app.schemas.deployment import Deployment, DeploymentPlan, DeploymentStep, PlanChange, Resource
 from app.schemas.rollback import RollbackResult
-from app.services.resources import (
-    get_deployment_resource_snapshot,
-    persist_resource_snapshot,
-    persist_resources_for_deployment,
-)
+from app.services.resources import get_deployment_resource_snapshot, persist_resource_snapshot
 from app.services.simulator import create_deployment
 from app.services.templates import get_template, get_template_plan
 
@@ -38,7 +34,7 @@ def deploy_template(db: Session, template_id: str) -> Optional[Deployment]:
         estimated_monthly_cost=deployment.plan.estimated_monthly_cost,
     )
     db.add(record)
-    persist_resources_for_deployment(db, record, deployment.plan)
+    persist_resource_snapshot(db, record, deployment.plan.target_resources)
 
     project = db.get(Project, template.project_id)
     if project is not None:
@@ -152,6 +148,7 @@ def _rollback_plan(template_name: str, resources: list[Resource]) -> DeploymentP
         summary={"create": 0, "update": len(resources), "delete": 0, "rollback": len(resources)},
         changes=changes,
         estimated_monthly_cost=sum(resource.estimated_monthly_cost for resource in resources),
+        target_resources=resources,
     )
 
 

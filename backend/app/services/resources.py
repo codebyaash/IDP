@@ -22,6 +22,7 @@ def persist_resources_for_deployment(db: Session, deployment: DeploymentRecord, 
                 region=resource.region,
                 dependencies=resource.dependencies,
                 estimated_monthly_cost=resource.estimated_monthly_cost,
+                resource_metadata=resource.metadata,
             )
         )
 
@@ -42,6 +43,7 @@ def persist_resource_snapshot(
                 region=resource.region,
                 dependencies=resource.dependencies,
                 estimated_monthly_cost=resource.estimated_monthly_cost,
+                resource_metadata=resource.metadata,
             )
         )
 
@@ -60,9 +62,17 @@ def get_deployment_resource_snapshot(db: Session, deployment_id: str) -> list[Re
             region=resource.region,
             dependencies=resource.dependencies,
             estimated_monthly_cost=resource.estimated_monthly_cost,
+            metadata=resource.resource_metadata,
         )
         for resource in db.scalars(statement)
     ]
+
+
+def get_latest_project_resource_snapshot(db: Session, project_id: str) -> list[Resource]:
+    deployment = _latest_deployment(db, project_id)
+    if deployment is None:
+        return []
+    return get_deployment_resource_snapshot(db, deployment.id)
 
 
 def list_project_resources(db: Session, project_id: str) -> list[PersistedResource]:

@@ -25,11 +25,15 @@ def ensure_local_schema() -> None:
         return
 
     project_columns = {column["name"] for column in inspector.get_columns("projects")}
-    if "user_id" in project_columns:
-        return
+    resource_columns = set()
+    if "resources" in inspector.get_table_names():
+        resource_columns = {column["name"] for column in inspector.get_columns("resources")}
 
     with engine.begin() as connection:
-        connection.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR"))
+        if "user_id" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR"))
+        if "resources" in inspector.get_table_names() and "resource_metadata" not in resource_columns:
+            connection.execute(text("ALTER TABLE resources ADD COLUMN resource_metadata JSON DEFAULT '{}'"))
 
 
 app = FastAPI(

@@ -263,3 +263,76 @@ resources:
     cost = client.get("/api/projects/demo-azure-core/cost-estimate", headers=auth_headers).json()
 
     assert cost["total_monthly_cost"] == 12
+
+
+def test_plan_reports_drift_against_latest_deployment(client: TestClient, auth_headers: dict[str, str]) -> None:
+    baseline_template = """
+resources:
+  - name: rg-drift-test
+    type: resource_group
+    provider: azure
+    region: eastus
+  - name: st-drift-test
+    type: storage_account
+    provider: azure
+    region: eastus
+"""
+    drift_template = """
+resources:
+  - name: rg-drift-test
+    type: resource_group
+    provider: azure
+    region: eastus
+  - name: vm-drift-test
+    type: vm
+    provider: azure
+    region: westus
+"""
+
+    baseline_upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        files={"file": ("drift-baseline.yaml", baseline_template, "text/yaml")},
+        headers=auth_headers,
+    )
+    client.post(f"/api/templates/{baseline_upload.json()['template']['id']}/deploy", headers=auth_headers)
+
+    drift_upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        files={"file": ("drift-next.yaml", drift_template, "text/yaml")},
+        headers=auth_headers,
+    )
+    plan = client.post(f"/api/templates/{drift_upload.json()['template']['id']}/plan", headers=auth_headers)
+
+    assert plan.status_code == 200
+    payload = plan.json()
+    assert payload["drift"]["creates"] == 1
+    assert payload["drift"]["deletes"] == 1
+    assert payload["drift"]["unchanged"] == 1
+    assert payload["summary"]["create"] == 1
+    assert payload["summary"]["delete"] == 1
+
+
+def test_plan_reports_policy_violations(client: TestClient, auth_headers: dict[str, str]) -> None:
+    template = """
+resources:
+  - name: public-ip-risk
+    type: public_ip
+    provider: azure
+    region: eastus
+  - name: vm-expensive-risk
+    type: azurerm_windows_virtual_machine
+    provider: azure
+    region: eastus
+"""
+
+    upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        files={"file": ("policy.yaml", template, "text/yaml")},
+        headers=auth_headers,
+    )
+    plan = client.post(f"/api/templates/{upload.json()['template']['id']}/plan", headers=auth_headers)
+
+    assert plan.status_code == 200
+    rule_ids = {violation["rule_id"] for violation in plan.json()["policy_violations"]}
+    assert "POLICY_PUBLIC_RESOURCE" in rule_ids
+    assert "POLICY_EXPENSIVE_RESOURCE" in rule_ids

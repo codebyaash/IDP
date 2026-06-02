@@ -52,21 +52,32 @@ export type Resource = {
   region: string;
   dependencies: string[];
   estimated_monthly_cost: number;
+  metadata: Record<string, unknown>;
 };
 
 export type DeploymentPlan = {
   template_name: string;
-  summary: {
-    create: number;
-    update: number;
-    delete: number;
-  };
+  summary: Record<string, number>;
   changes: Array<{
     action: string;
     resource: Resource;
     reason: string;
   }>;
   estimated_monthly_cost: number;
+  target_resources: Resource[];
+  drift: {
+    creates: number;
+    updates: number;
+    deletes: number;
+    unchanged: number;
+  };
+  policy_violations: Array<{
+    rule_id: string;
+    severity: string;
+    resource_name: string;
+    resource_type: string;
+    message: string;
+  }>;
 };
 
 export type Deployment = {
@@ -98,6 +109,7 @@ export type PersistedResource = {
   region: string;
   dependencies: string[];
   estimated_monthly_cost: number;
+  resource_metadata: Record<string, unknown>;
 };
 
 export type CostEstimate = {

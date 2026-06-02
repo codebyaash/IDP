@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { Background, Controls, MiniMap, ReactFlow, type Edge, type Node } from "@xyflow/react";
 import { Activity, CloudUpload, FileCode2, GitBranch, ListChecks, Play, Plus, RotateCcw } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
@@ -128,6 +129,47 @@ export function ProjectDashboard() {
   const totalCost = useMemo(() => projects.reduce((sum, project) => sum + project.monthly_cost, 0), [projects]);
   const deploymentCount = projects.length * 7;
   const resourceTypeCostData = costEstimate?.breakdown ?? [];
+  const graphNodes = useMemo<Node[]>(
+    () =>
+      resources.map((resource, index) => ({
+        id: resource.resource_name,
+        position: { x: (index % 2) * 230, y: Math.floor(index / 2) * 115 },
+        data: {
+          label: (
+            <div className="text-left">
+              <p className="truncate text-sm font-semibold">{resource.resource_name}</p>
+              <p className="truncate text-xs text-slate-500">{resource.resource_type}</p>
+              <p className="mt-1 text-xs font-semibold text-signal">${resource.estimated_monthly_cost}/mo</p>
+            </div>
+          ),
+        },
+        style: {
+          width: 180,
+          border: "1px solid #cbd5e1",
+          borderRadius: 8,
+          background: "#ffffff",
+          color: "#172033",
+          padding: 10,
+          boxShadow: "0 1px 2px rgb(15 23 42 / 0.06)",
+        },
+      })),
+    [resources],
+  );
+  const graphEdges = useMemo<Edge[]>(() => {
+    const resourceNames = new Set(resources.map((resource) => resource.resource_name));
+
+    return resources.flatMap((resource) =>
+      resource.dependencies
+        .filter((dependency) => resourceNames.has(dependency))
+        .map((dependency) => ({
+          id: `${dependency}-${resource.resource_name}`,
+          source: dependency,
+          target: resource.resource_name,
+          animated: true,
+          style: { stroke: "#2a9d8f" },
+        })),
+    );
+  }, [resources]);
 
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -482,6 +524,45 @@ export function ProjectDashboard() {
                 </button>
               </div>
               <div className="divide-y divide-slate-100">
+                <div className="grid gap-3 px-5 py-4 text-sm sm:grid-cols-4">
+                  {[
+                    ["creates", deploymentPlan.drift.creates],
+                    ["updates", deploymentPlan.drift.updates],
+                    ["deletes", deploymentPlan.drift.deletes],
+                    ["unchanged", deploymentPlan.drift.unchanged],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md border border-slate-200 bg-panel px-3 py-2">
+                      <p className="text-lg font-semibold text-[#172033]">{value}</p>
+                      <p className="text-xs uppercase text-slate-500">drift {label}</p>
+                    </div>
+                  ))}
+                </div>
+                {deploymentPlan.policy_violations.length > 0 ? (
+                  <div className="bg-amber-50 px-5 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-amber-900">Policy checks</p>
+                      <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold uppercase text-amber-800">
+                        {deploymentPlan.policy_violations.length} findings
+                      </span>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {deploymentPlan.policy_violations.map((violation) => (
+                        <div
+                          className="grid gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm md:grid-cols-[92px_1fr]"
+                          key={`${violation.rule_id}-${violation.resource_name}`}
+                        >
+                          <span className="w-fit rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold uppercase text-amber-800">
+                            {violation.severity}
+                          </span>
+                          <div>
+                            <p className="font-semibold text-amber-950">{violation.resource_name}</p>
+                            <p className="text-amber-800">{violation.message}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {deploymentPlan.changes.map((change) => (
                   <div
                     className="grid gap-3 px-5 py-4 text-sm md:grid-cols-[90px_1fr_auto] md:items-center"
@@ -579,22 +660,20 @@ export function ProjectDashboard() {
               <GitBranch className="text-ink" />
               <h2 className="text-lg font-semibold">Resource Graph</h2>
             </div>
-            {resources.length > 0 ? (
-              <div className="mt-5 space-y-3">
-                {resources.map((resource) => (
-                  <div key={resource.id} className="rounded-md border border-slate-200 bg-panel px-4 py-3 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-semibold">{resource.resource_name}</span>
-                      <span className="text-xs uppercase text-slate-500">{resource.resource_type}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">{resource.region}</p>
-                    <p className="mt-2 text-xs text-signal">
-                      {resource.dependencies.length > 0
-                        ? `depends on ${resource.dependencies.join(", ")}`
-                        : "root resource"}
-                    </p>
-                  </div>
-                ))}
+            {graphNodes.length > 0 ? (
+              <div className="mt-5 h-80 overflow-hidden rounded-md border border-slate-200 bg-panel">
+                <ReactFlow
+                  edges={graphEdges}
+                  elementsSelectable={false}
+                  fitView
+                  nodes={graphNodes}
+                  nodesConnectable={false}
+                  nodesDraggable={false}
+                >
+                  <Background color="#cbd5e1" gap={18} />
+                  <MiniMap pannable={false} zoomable={false} />
+                  <Controls showInteractive={false} />
+                </ReactFlow>
               </div>
             ) : (
               <p className="mt-5 text-sm text-slate-500">Deploy a template to populate the dependency graph.</p>

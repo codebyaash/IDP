@@ -13,8 +13,10 @@ from app.schemas.deployment import (
     Deployment,
     DeploymentPlan,
     DeploymentStep,
+    DriftReport,
     ParsedTemplate,
     PlanChange,
+    PolicyViolation,
     Resource,
     TemplateValidation,
 )
@@ -76,17 +78,64 @@ def validate_template(file_name: str, content: str) -> TemplateValidation:
     )
 
 
-def generate_plan(template: ParsedTemplate) -> DeploymentPlan:
-    changes = [
-        PlanChange(action="create", resource=resource, reason="Resource is not present in the simulated state.")
-        for resource in template.resources
-    ]
-    total_cost = sum(change.resource.estimated_monthly_cost for change in changes)
+def generate_plan(template: ParsedTemplate, current_resources: Optional[list[Resource]] = None) -> DeploymentPlan:
+    current_by_name = {resource.name: resource for resource in current_resources or []}
+    desired_by_name = {resource.name: resource for resource in template.resources}
+    changes: list[PlanChange] = []
+    unchanged = 0
+
+    for desired in template.resources:
+        current = current_by_name.get(desired.name)
+        if current is None:
+            changes.append(
+                PlanChange(
+                    action="create",
+                    resource=desired,
+                    reason="Resource is not present in the simulated state.",
+                )
+            )
+            continue
+
+        if _resource_changed(current, desired):
+            changes.append(
+                PlanChange(
+                    action="update",
+                    resource=desired,
+                    reason="Resource differs from the latest deployed state.",
+                )
+            )
+        else:
+            unchanged += 1
+
+    for current in current_by_name.values():
+        if current.name not in desired_by_name:
+            changes.append(
+                PlanChange(
+                    action="delete",
+                    resource=current,
+                    reason="Resource exists in the latest deployment but is absent from the new template.",
+                )
+            )
+
+    total_cost = sum(resource.estimated_monthly_cost for resource in template.resources)
+    summary = {
+        "create": sum(1 for change in changes if change.action == "create"),
+        "update": sum(1 for change in changes if change.action == "update"),
+        "delete": sum(1 for change in changes if change.action == "delete"),
+    }
     return DeploymentPlan(
         template_name=template.file_name,
-        summary={"create": len(changes), "update": 0, "delete": 0},
+        summary=summary,
         changes=changes,
         estimated_monthly_cost=total_cost,
+        target_resources=template.resources,
+        drift=DriftReport(
+            creates=summary["create"],
+            updates=summary["update"],
+            deletes=summary["delete"],
+            unchanged=unchanged,
+        ),
+        policy_violations=_policy_violations(template.resources),
     )
 
 
@@ -131,6 +180,7 @@ def _resources_from_terraform(document: dict[str, Any]) -> list[Resource]:
                         resource_type=resource_type,
                         region=config.get("location", "eastus") if isinstance(config, dict) else "eastus",
                         dependencies=_extract_terraform_dependencies(config),
+                        metadata=config if isinstance(config, dict) else {},
                     )
                 )
     return resources
@@ -146,6 +196,7 @@ def _resources_from_mapping(document: dict[str, Any]) -> list[Resource]:
                 resource_type=item.get("type", "resource"),
                 region=item.get("region", item.get("location", "eastus")),
                 dependencies=item.get("depends_on", item.get("dependencies", [])),
+                metadata=item,
             )
         )
     return resources
@@ -170,6 +221,7 @@ def _build_resource(
     resource_type: str,
     region: str = "eastus",
     dependencies: Optional[list[str]] = None,
+    metadata: Optional[dict[str, Any]] = None,
 ) -> Resource:
     return Resource(
         name=name,
@@ -177,6 +229,7 @@ def _build_resource(
         region=region,
         dependencies=dependencies or [],
         estimated_monthly_cost=COST_BY_TYPE.get(resource_type, 8),
+        metadata=metadata or {},
     )
 
 
@@ -200,3 +253,55 @@ def _collect_terraform_dependencies(value: Any, dependencies: list[str]) -> None
     if isinstance(value, dict):
         for item in value.values():
             _collect_terraform_dependencies(item, dependencies)
+
+
+def _resource_changed(current: Resource, desired: Resource) -> bool:
+    return (
+        current.type != desired.type
+        or current.region != desired.region
+        or current.dependencies != desired.dependencies
+        or current.estimated_monthly_cost != desired.estimated_monthly_cost
+        or current.metadata != desired.metadata
+    )
+
+
+def _policy_violations(resources: list[Resource]) -> list[PolicyViolation]:
+    violations = []
+    for resource in resources:
+        metadata = resource.metadata
+        public_access = metadata.get("public_access") or metadata.get("allow_public_access")
+
+        if resource.type in {"azurerm_public_ip", "public_ip"} or public_access is True:
+            violations.append(
+                PolicyViolation(
+                    rule_id="POLICY_PUBLIC_RESOURCE",
+                    severity="high",
+                    resource_name=resource.name,
+                    resource_type=resource.type,
+                    message="Publicly reachable resources require review before deployment.",
+                )
+            )
+
+        if resource.estimated_monthly_cost >= 50:
+            violations.append(
+                PolicyViolation(
+                    rule_id="POLICY_EXPENSIVE_RESOURCE",
+                    severity="medium",
+                    resource_name=resource.name,
+                    resource_type=resource.type,
+                    message="Estimated monthly cost is above the portfolio policy threshold.",
+                )
+            )
+
+        tags = metadata.get("tags")
+        if resource.type not in {"resource_group", "azurerm_resource_group"} and isinstance(tags, dict) and not tags:
+            violations.append(
+                PolicyViolation(
+                    rule_id="POLICY_EMPTY_TAGS",
+                    severity="low",
+                    resource_name=resource.name,
+                    resource_type=resource.type,
+                    message="Resource has an empty tag set.",
+                )
+            )
+    return violations

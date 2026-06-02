@@ -72,6 +72,7 @@ class ResourceRecord(Base):
     region: Mapped[str] = mapped_column(String(80), nullable=False, default="eastus")
     dependencies: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     estimated_monthly_cost: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    resource_metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     project: Mapped[Project] = relationship(back_populates="resources")

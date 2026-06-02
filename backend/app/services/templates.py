@@ -4,6 +4,7 @@ from typing import Optional
 
 from app.models import IacTemplate
 from app.schemas.deployment import DeploymentPlan, ParsedTemplate
+from app.services.resources import get_latest_project_resource_snapshot
 from app.services.simulator import generate_plan, parse_template_content
 
 
@@ -37,7 +38,8 @@ def get_template_plan(db: Session, template_id: str) -> Optional[DeploymentPlan]
     if template is None:
         return None
     parsed = parse_template_content(template.file_name, template.raw_content)
-    return generate_plan(parsed)
+    current_resources = get_latest_project_resource_snapshot(db, template.project_id)
+    return generate_plan(parsed, current_resources=current_resources)
 
 
 def _next_template_version(db: Session, project_id: str) -> int:
