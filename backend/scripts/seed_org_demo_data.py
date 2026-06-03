@@ -14,10 +14,10 @@ from pathlib import Path
 from typing import Any
 
 DB_PATH = Path(__file__).resolve().parents[1] / "deployforge.db"
-ORG_ID = "deployforge.local"
-ORG_NAME = "Deployforge"
-SEED_USER_ID = "ash-deployforge-local"
-SEED_USER_EMAIL = "ash@deployforge.local"
+ORG_ID = "deploy-forge.local"
+ORG_NAME = "Deploy Forge"
+SEED_USER_ID = "ash-deploy-forge-local"
+SEED_USER_EMAIL = "ash@deploy-forge.local"
 SEED_USER_PASSWORD = "ashtest123"
 NOW = datetime(2026, 6, 3, 10, 0, 0)
 ACTIVE_SEED_USER_ID = SEED_USER_ID
