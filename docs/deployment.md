@@ -2,6 +2,14 @@
 
 DeployForge is designed for a free portfolio deployment with Vercel for the frontend and Render for the backend.
 
+Current hosted demo:
+
+```text
+Frontend: https://deployforge-eight.vercel.app
+Backend: https://deployforge-api.onrender.com
+Swagger: https://deployforge-api.onrender.com/docs
+```
+
 ## Backend
 
 Use `render.yaml` as the Render blueprint.
@@ -12,7 +20,7 @@ Required production environment variables:
 APP_ENV=production
 DATABASE_URL=<postgres-or-compatible-url>
 SECRET_KEY=<long-random-secret>
-CORS_ORIGINS=https://your-frontend-domain.example
+CORS_ORIGINS=https://deployforge-eight.vercel.app
 AUTO_CREATE_TABLES=false
 REPAIR_LOCAL_SCHEMA=false
 SEED_DEMO_DATA=false
@@ -29,7 +37,7 @@ alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
 Set this environment variable in Vercel:
 
 ```text
-NEXT_PUBLIC_API_BASE_URL=https://your-render-backend.example
+NEXT_PUBLIC_API_BASE_URL=https://deployforge-api.onrender.com
 ```
 
 Then deploy the `frontend` directory.

@@ -1,6 +1,6 @@
 # MVP Roadmap
 
-Status: core MVP is implemented. The remaining work is mostly portfolio polish, hosted deployment, screenshots, and deeper parser coverage.
+Status: core MVP is implemented and hosted. The remaining work is mostly screenshot polish and deeper parser coverage.
 
 ## Week 1
 

@@ -3,13 +3,15 @@
 Swagger UI is available at:
 
 ```text
-GET /docs
+Local:  GET /docs
+Hosted: https://deployforge-api.onrender.com/docs
 ```
 
 OpenAPI JSON is available at:
 
 ```text
-GET /openapi.json
+Local:  GET /openapi.json
+Hosted: https://deployforge-api.onrender.com/openapi.json
 ```
 
 Current API surface:
@@ -54,6 +56,6 @@ Template upload accepts `environment` as a multipart form field.
 ## Demo Login
 
 ```text
-Email: ash@deployforge.local
-Password: ashtest123
+Email: ash-prod@deploy-forge.local
+Password: ashprod123
 ```

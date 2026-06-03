@@ -10,7 +10,7 @@ This project is built as a portfolio-grade DevOps and full-stack system: it demo
 
 **Best fit roles:** DevOps Engineer, Cloud Engineer, Platform Engineer, Full Stack Engineer.
 
-**Project status:** Local demo ready. Hosted demo and screenshots are the next public-sharing items.
+**Project status:** Hosted demo ready. Screenshot folders are prepared under `docs/screenshots/` for final portfolio polish.
 
 **What it proves:**
 
@@ -87,13 +87,29 @@ Upload IaC
 
 ## Screens To Show
 
-Add screenshots or a short GIF of these screens before sharing publicly:
+Add screenshots or a short GIF before sharing publicly. Screenshot folders and filename guides are included under `docs/screenshots/`.
 
-- Dashboard with projects, pipeline, history, and cost chart
-- Upload template and deployment plan with drift/policy findings
-- Full resource graph with selected resource inspector
-- Deployment detail page with logs, resource snapshot, and rollback action
-- Swagger docs at `/docs`
+Recommended frontend captures:
+
+- Login
+- Overview dashboard
+- Projects
+- Upload and deployment plan
+- Deployments history
+- Deployment detail
+- Resource graph
+- Cost dashboard
+- Profile overview
+- Profile history
+
+Recommended backend and ops captures:
+
+- Swagger overview
+- Auth, projects, templates, deployments, resources, cost, and profile endpoints
+- Health check
+- GitHub Actions green run
+- Render live service
+- Vercel production deployment
 
 ## Demo Links
 
@@ -107,7 +123,16 @@ Backend Swagger: http://127.0.0.1:8001/docs
 Hosted demo:
 
 ```text
-Coming soon
+Frontend: https://deployforge-eight.vercel.app
+Backend Swagger: https://deployforge-api.onrender.com/docs
+API Health: https://deployforge-api.onrender.com/health
+```
+
+Production demo account:
+
+```text
+Email: ash-prod@deploy-forge.local
+Password: ashprod123
 ```
 
 ## Local Development
@@ -126,8 +151,8 @@ uvicorn app.main:app --reload --port 8001
 Local defaults are built in. Use `backend/.env.example` as the reference when setting shell or hosting environment variables. The backend seeds a demo user and project on startup unless `SEED_DEMO_DATA=false`.
 
 ```text
-Email: ash@deployforge.local
-Password: ashtest123
+Email: ash-prod@deploy-forge.local
+Password: ashprod123
 ```
 
 Useful backend URLs:
@@ -188,7 +213,7 @@ Backend production deploys should run Alembic migrations before starting the API
 APP_ENV=production
 DATABASE_URL=<postgres-or-compatible-url>
 SECRET_KEY=<long-random-secret>
-CORS_ORIGINS=https://your-frontend-domain.example
+CORS_ORIGINS=https://deployforge-eight.vercel.app
 AUTO_CREATE_TABLES=false
 REPAIR_LOCAL_SCHEMA=false
 SEED_DEMO_DATA=false
@@ -229,6 +254,7 @@ DeployForge/
   backend/             FastAPI API, SQLAlchemy models, services, tests, Alembic migrations
   frontend/            Next.js app, dashboard, deployment detail route, API client
   docs/                Architecture, API notes, roadmap, demo script
+  docs/screenshots/    Screenshot folders for frontend, backend, and ops proof
   sample-templates/    Terraform and YAML templates for demos
   render.yaml           Render backend deployment blueprint
   .github/workflows/   CI pipeline
@@ -247,8 +273,7 @@ DeployForge/
 
 ## Roadmap
 
-- Persist policy violations and audit logs as first-class tables.
 - Add GitHub raw URL import for templates.
-- Add screenshots and a hosted demo URL.
+- Add screenshots to `docs/screenshots/`.
 - Add Playwright coverage for dashboard and deployment detail workflows.
 - Support richer Terraform expressions and Bicep resource dependency extraction.
