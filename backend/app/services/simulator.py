@@ -195,8 +195,13 @@ def _resources_from_terraform(document: dict[str, Any]) -> list[Resource]:
 
 def _resources_from_mapping(document: dict[str, Any]) -> list[Resource]:
     raw_resources = document.get("resources", [])
+    if not isinstance(raw_resources, list):
+        raise ValueError("The resources field must be a list.")
+
     resources = []
     for item in raw_resources:
+        if not isinstance(item, dict):
+            raise ValueError("Each resource entry must be an object.")
         resources.append(
             _build_resource(
                 name=item.get("name", "unnamed-resource"),

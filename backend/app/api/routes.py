@@ -25,6 +25,35 @@ from app.services.templates import create_template, get_template, get_template_p
 router = APIRouter(prefix="/api")
 
 
+def _parse_uploaded_template(file_name: str, content: str):
+    try:
+        parsed = parse_template_content(file_name, content)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if not parsed.resources:
+        raise HTTPException(status_code=422, detail="No resources found in template.")
+
+    duplicate_names = _duplicate_resource_names([resource.name for resource in parsed.resources])
+    if duplicate_names:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Duplicate resource names are not allowed: {', '.join(duplicate_names)}.",
+        )
+
+    return parsed
+
+
+def _duplicate_resource_names(resource_names: list[str]) -> list[str]:
+    seen = set()
+    duplicates = []
+    for name in resource_names:
+        if name in seen and name not in duplicates:
+            duplicates.append(name)
+        seen.add(name)
+    return duplicates
+
+
 @router.post("/auth/register", response_model=TokenResponse, status_code=201, tags=["Auth"], summary="Register a user")
 def register(credentials: AuthCredentials, db: Session = Depends(get_db)) -> TokenResponse:
     if get_user_by_email(db, credentials.email) is not None:
@@ -194,9 +223,7 @@ async def upload_project_template(
         raise HTTPException(status_code=404, detail="Project not found.")
 
     content = (await file.read()).decode("utf-8")
-    parsed = parse_template_content(file.filename or "template", content)
-    if not parsed.resources:
-        raise HTTPException(status_code=422, detail="No resources found in template.")
+    parsed = _parse_uploaded_template(file.filename or "template", content)
 
     template = create_template(db, project_id=project_id, raw_content=content, parsed=parsed, environment=environment)
     return TemplateUploadResult(template=template, resources=parsed.resources, warnings=[])
@@ -264,9 +291,7 @@ async def validate_uploaded_template(file: UploadFile = File(...)) -> TemplateVa
 )
 async def plan_uploaded_template(file: UploadFile = File(...)) -> DeploymentPlan:
     content = (await file.read()).decode("utf-8")
-    parsed = parse_template_content(file.filename or "template", content)
-    if not parsed.resources:
-        raise HTTPException(status_code=422, detail="No resources found in template.")
+    parsed = _parse_uploaded_template(file.filename or "template", content)
     return generate_plan(parsed)
 
 
@@ -278,8 +303,6 @@ async def plan_uploaded_template(file: UploadFile = File(...)) -> DeploymentPlan
 )
 async def deploy_uploaded_template(file: UploadFile = File(...)) -> Deployment:
     content = (await file.read()).decode("utf-8")
-    parsed = parse_template_content(file.filename or "template", content)
-    if not parsed.resources:
-        raise HTTPException(status_code=422, detail="No resources found in template.")
+    parsed = _parse_uploaded_template(file.filename or "template", content)
     plan = generate_plan(parsed)
     return create_deployment(plan)

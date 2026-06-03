@@ -188,6 +188,40 @@ def test_invalid_template_environment_is_rejected(client: TestClient, auth_heade
     assert upload.status_code == 422
 
 
+def test_template_upload_rejects_invalid_resource_shape(client: TestClient, auth_headers: dict[str, str]) -> None:
+    upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        files={"file": ("invalid-shape.yaml", "resources: nope", "text/yaml")},
+        headers=auth_headers,
+    )
+
+    assert upload.status_code == 422
+    assert "resources field must be a list" in upload.json()["detail"]
+
+
+def test_template_upload_rejects_duplicate_resource_names(client: TestClient, auth_headers: dict[str, str]) -> None:
+    template = """
+resources:
+  - name: duplicate-resource
+    type: resource_group
+    provider: azure
+    region: eastus
+  - name: duplicate-resource
+    type: storage_account
+    provider: azure
+    region: eastus
+"""
+
+    upload = client.post(
+        "/api/projects/demo-azure-core/templates/upload",
+        files={"file": ("duplicate.yaml", template, "text/yaml")},
+        headers=auth_headers,
+    )
+
+    assert upload.status_code == 422
+    assert "Duplicate resource names" in upload.json()["detail"]
+
+
 def test_generate_plan_from_saved_template(client: TestClient, auth_headers: dict[str, str]) -> None:
     template = """
 resources:
