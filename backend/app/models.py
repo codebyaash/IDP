@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
@@ -151,9 +152,9 @@ class AuditLog(Base):
     organization_id: Mapped[str] = mapped_column(String(255), nullable=False)
     action: Mapped[str] = mapped_column(String(80), nullable=False)
     entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
-    entity_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    project_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    environment: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    entity_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    project_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    environment: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     message: Mapped[str] = mapped_column(String(500), nullable=False)
     metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)

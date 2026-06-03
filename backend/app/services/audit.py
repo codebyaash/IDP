@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -11,10 +13,10 @@ def log_activity(
     entity_type: str,
     message: str,
     *,
-    entity_id: str | None = None,
-    project_id: str | None = None,
-    environment: str | None = None,
-    metadata: dict | None = None,
+    entity_id: Optional[str] = None,
+    project_id: Optional[str] = None,
+    environment: Optional[str] = None,
+    metadata: Optional[dict] = None,
     commit: bool = True,
 ) -> AuditLog:
     entry = AuditLog(

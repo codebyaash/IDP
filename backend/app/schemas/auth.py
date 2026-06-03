@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -25,9 +25,9 @@ class AuditLogRead(BaseModel):
     id: str
     action: str
     entity_type: str
-    entity_id: str | None
-    project_id: str | None
-    environment: str | None
+    entity_id: Optional[str]
+    project_id: Optional[str]
+    environment: Optional[str]
     message: str
     metadata_json: dict[str, Any]
     created_at: datetime
