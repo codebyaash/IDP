@@ -1,41 +1,45 @@
 # MVP Roadmap
 
+Status: core MVP is implemented. The remaining work is mostly portfolio polish, hosted deployment, screenshots, and deeper parser coverage.
+
 ## Week 1
 
-- Project setup
-- Backend API skeleton
-- Frontend dashboard shell
-- Sample IaC templates
-- Architecture docs
+- Done: Project setup
+- Done: Backend API skeleton
+- Done: Frontend dashboard shell
+- Done: Sample IaC templates
+- Done: Architecture docs
 
 ## Week 2
 
-- Project CRUD
-- Template upload
-- Template storage model
-- Basic auth screens
+- Done: Project creation/listing
+- Done: Template upload
+- Done: Template storage model
+- Done: Auth flow
 
 ## Week 3
 
-- Terraform and YAML parser hardening
-- Validation rules
-- Deployment plan generation
+- Done: Terraform, YAML, JSON, and Bicep parsing
+- Done: Validation rules
+- Done: Deployment plan generation
 
 ## Week 4
 
-- Pipeline simulation
-- Deployment logs
-- Deployment history
+- Done: Pipeline simulation
+- Done: Deployment logs
+- Done: Deployment history
 
 ## Week 5
 
-- Resource graph
-- Cost dashboard
-- Rollback workflow
+- Done: React Flow resource graph
+- Done: Cost dashboard
+- Done: Rollback workflow
 
 ## Week 6
 
-- UI polish
-- README screenshots
-- Deployment docs
-- Demo video script
+- Done: Environment-aware deployments
+- Done: Deployment detail page
+- Done: Alembic migrations and DB hardening
+- Done: CI upgrades
+- In progress: README and recruiter polish
+- Next: Screenshots, hosted demo, demo video

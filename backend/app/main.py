@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import inspect, text
 
 from app.api.routes import router
+from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine
 from app import models
 from app.services.projects import seed_demo_user_and_project
@@ -13,10 +14,13 @@ from app.services.projects import seed_demo_user_and_project
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    ensure_local_schema()
-    with SessionLocal() as db:
-        seed_demo_user_and_project(db)
+    if settings.auto_create_tables:
+        Base.metadata.create_all(bind=engine)
+    if settings.repair_local_schema and settings.sqlalchemy_database_url.startswith("sqlite"):
+        ensure_local_schema()
+    if settings.seed_demo_data:
+        with SessionLocal() as db:
+            seed_demo_user_and_project(db)
     yield
 
 
@@ -56,14 +60,14 @@ def ensure_local_schema() -> None:
 
 
 app = FastAPI(
-    title="DeployForge API",
+    title=settings.app_name,
     summary="Simulation-first infrastructure deployment platform API.",
     description=(
         "DeployForge provides portfolio-safe infrastructure workflows: upload IaC templates, "
         "validate and plan changes, simulate environment-aware deployments, inspect resource graphs, "
         "estimate monthly cost, and roll back to previous deployment snapshots."
     ),
-    version="0.1.0",
+    version=settings.app_version,
     lifespan=lifespan,
     contact={
         "name": "DeployForge Portfolio API",
@@ -88,7 +92,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -99,7 +103,7 @@ app.include_router(router)
 
 @app.get("/health", tags=["System"], summary="Check API health")
 def health_check() -> dict[str, str]:
-    return {"status": "ok", "service": "deployforge-api"}
+    return {"status": "ok", "service": "deployforge-api", "environment": settings.app_env}
 
 
 @app.get("/", include_in_schema=False)

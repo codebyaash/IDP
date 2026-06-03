@@ -9,6 +9,7 @@ from sqlalchemy import engine_from_config, pool
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT_DIR))
 
+from app.core.config import settings
 from app.core.database import Base
 from app import models
 
@@ -21,7 +22,9 @@ target_metadata = Base.metadata
 
 
 def database_url() -> str:
-    return os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+    if os.getenv("DATABASE_URL") is not None:
+        return settings.sqlalchemy_database_url
+    return config.get_main_option("sqlalchemy.url")
 
 
 def run_migrations_offline() -> None:

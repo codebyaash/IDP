@@ -1,6 +1,18 @@
 # DeployForge API
 
-Initial API surface:
+Swagger UI is available at:
+
+```text
+GET /docs
+```
+
+OpenAPI JSON is available at:
+
+```text
+GET /openapi.json
+```
+
+Current API surface:
 
 ```text
 GET    /health
@@ -29,8 +41,19 @@ Project, template, deployment, resource, and cost endpoints require:
 Authorization: Bearer <access_token>
 ```
 
-Planned API surface:
+Environment-scoped endpoints accept:
 
 ```text
-GET    /projects/{id}/policy-checks
+?environment=dev
+?environment=stage
+?environment=prod
+```
+
+Template upload accepts `environment` as a multipart form field.
+
+## Demo Login
+
+```text
+Email: demo@deployforge.local
+Password: deployforge123
 ```

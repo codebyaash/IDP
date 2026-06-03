@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
+from app.core.config import Settings
 from app.main import app
 from app.models import Project
 from app.services.projects import DEMO_USER_EMAIL, DEMO_USER_PASSWORD, seed_demo_user_and_project
@@ -123,6 +124,30 @@ def test_database_rejects_orphan_project() -> None:
         db.add(Project(user_id="missing-user", name="Orphan Project", cloud_provider="azure", environment="dev"))
         with pytest.raises(IntegrityError):
             db.commit()
+
+
+def test_production_settings_reject_unsafe_defaults() -> None:
+    settings = Settings(app_env="production")
+
+    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+        settings.validate_production()
+
+
+def test_production_settings_accept_safe_runtime_values() -> None:
+    settings = Settings(
+        app_env="production",
+        secret_key="not-the-local-development-secret",
+        auto_create_tables=False,
+        seed_demo_data=False,
+    )
+
+    settings.validate_production()
+
+
+def test_postgres_database_url_uses_psycopg_driver() -> None:
+    settings = Settings(database_url="postgresql://user:password@example.com/deployforge")
+
+    assert settings.sqlalchemy_database_url == "postgresql+psycopg://user:password@example.com/deployforge"
 
 
 def test_upload_and_list_project_template(client: TestClient, auth_headers: dict[str, str]) -> None:
