@@ -126,8 +126,8 @@ uvicorn app.main:app --reload --port 8001
 Local defaults are built in. Use `backend/.env.example` as the reference when setting shell or hosting environment variables. The backend seeds a demo user and project on startup unless `SEED_DEMO_DATA=false`.
 
 ```text
-Email: demo@deployforge.local
-Password: deployforge123
+Email: ash@deployforge.local
+Password: ashtest123
 ```
 
 Useful backend URLs:

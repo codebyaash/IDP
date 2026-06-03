@@ -54,6 +54,6 @@ Template upload accepts `environment` as a multipart form field.
 ## Demo Login
 
 ```text
-Email: demo@deployforge.local
-Password: deployforge123
+Email: ash@deployforge.local
+Password: ashtest123
 ```

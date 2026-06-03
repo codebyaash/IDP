@@ -13,8 +13,8 @@ The app intentionally avoids provisioning real Azure resources, so it is safe to
 1. Sign in with the seeded demo account.
 
 ```text
-demo@deployforge.local
-deployforge123
+ash@deployforge.local
+ashtest123
 ```
 
 2. Show the dashboard.

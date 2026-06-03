@@ -55,8 +55,8 @@ const fallbackProjects: Project[] = [
 
 const pipeline = ["Queued", "Validating", "Planning", "Deploying", "Success"];
 const TOKEN_STORAGE_KEY = "deployforge_token";
-const DEMO_EMAIL = "demo@deployforge.local";
-const DEMO_PASSWORD = "deployforge123";
+const DEMO_EMAIL = "ash@deployforge.local";
+const DEMO_PASSWORD = "ashtest123";
 const deploymentEnvironments = ["dev", "stage", "prod"];
 const graphFilterAll = "all";
 
