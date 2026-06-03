@@ -56,7 +56,15 @@ import {
   uploadTemplate,
 } from "@/lib/api";
 
-type WorkspaceMode = "overview" | "projects" | "upload" | "deployments" | "resources" | "cost" | "profile";
+type WorkspaceMode =
+  | "overview"
+  | "projects"
+  | "upload"
+  | "deployments"
+  | "resources"
+  | "cost"
+  | "profile"
+  | "profile-history";
 
 const TOKEN_STORAGE_KEY = "deployforge_token";
 const SELECTED_PROJECT_KEY = "deployforge_selected_project";
@@ -604,7 +612,7 @@ export function WorkspacePage({ mode }: { mode: WorkspaceMode }) {
           <nav className="mt-5 grid gap-1 sm:grid-cols-3 lg:grid-cols-1">
             {navigation.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || (item.href === "/profile" && pathname.startsWith("/profile"));
               return (
                 <Link
                   className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm font-semibold ${
@@ -1019,14 +1027,59 @@ export function WorkspacePage({ mode }: { mode: WorkspaceMode }) {
           <div className="space-y-6">
             <ActivityFeed
               description="Actions performed by the signed-in user."
-              items={profile?.activity ?? []}
+              items={(profile?.activity ?? []).slice(0, 5)}
+              linkHref="/profile/history#your-history"
+              linkLabel="View all"
               title="Your History"
             />
             <ActivityFeed
               description="Recent actions from users in the same organization."
-              items={profile?.organization_activity ?? []}
+              items={(profile?.organization_activity ?? []).slice(0, 5)}
+              linkHref="/profile/history#organization-history"
+              linkLabel="View all"
               title="Organization History"
             />
+          </div>
+        </div>
+      );
+    }
+
+    if (mode === "profile-history") {
+      return (
+        <div className="space-y-6">
+          <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Activity Archive</h2>
+                <p className="text-sm text-slate-500">
+                  {profile?.user.email ?? "Current user"} / {profile?.user.organization_name ?? "organization"}
+                </p>
+              </div>
+              <Link
+                className="inline-flex w-fit items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-ink"
+                href="/profile"
+              >
+                Profile overview
+                <ChevronRight size={16} />
+              </Link>
+            </div>
+          </section>
+
+          <div className="grid gap-6 xl:grid-cols-2">
+            <div id="your-history">
+              <ActivityFeed
+                description="Complete action trail for the signed-in user."
+                items={profile?.activity ?? []}
+                title="Your Full History"
+              />
+            </div>
+            <div id="organization-history">
+              <ActivityFeed
+                description="Complete recent action trail for users in the same organization."
+                items={profile?.organization_activity ?? []}
+                title="Organization Full History"
+              />
+            </div>
           </div>
         </div>
       );
@@ -1089,6 +1142,7 @@ function pageTitle(mode: WorkspaceMode) {
     resources: "Resource graph",
     cost: "Cost dashboard",
     profile: "Profile and activity history",
+    "profile-history": "Activity history",
   };
   return titles[mode];
 }
@@ -1102,6 +1156,7 @@ function pageDescription(mode: WorkspaceMode) {
     resources: "Explore the latest persisted deployment resources and dependency relationships.",
     cost: "Review monthly cost estimates by resource type for the selected project and environment.",
     profile: "Review your account, organization, personal activity, and shared organization history.",
+    "profile-history": "Open the full personal and organization activity history from your profile overview.",
   };
   return descriptions[mode];
 }
@@ -1175,12 +1230,35 @@ function DeploymentRow({
   );
 }
 
-function ActivityFeed({ description, items, title }: { description: string; items: AuditLog[]; title: string }) {
+function ActivityFeed({
+  description,
+  items,
+  linkHref,
+  linkLabel,
+  title,
+}: {
+  description: string;
+  items: AuditLog[];
+  linkHref?: string;
+  linkLabel?: string;
+  title: string;
+}) {
   return (
     <section className="rounded-md border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="text-sm text-slate-500">{description}</p>
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <p className="text-sm text-slate-500">{description}</p>
+        </div>
+        {linkHref && linkLabel ? (
+          <Link
+            className="inline-flex w-fit items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-ink"
+            href={linkHref}
+          >
+            {linkLabel}
+            <ChevronRight size={16} />
+          </Link>
+        ) : null}
       </div>
       <div className="divide-y divide-slate-100">
         {items.map((item) => (

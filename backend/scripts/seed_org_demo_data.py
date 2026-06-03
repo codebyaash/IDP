@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Seed rich organization-scoped demo data for local DeployForge testing.
 
-This script uses only the Python standard library so it can run before the
-backend virtualenv is active. It is idempotent for records with the
-``org-demo-`` prefix and keeps manually-created user test data intact.
+It is idempotent for records with the ``org-demo-`` prefix and keeps
+manually-created user test data intact.
 """
 
 from __future__ import annotations
@@ -17,9 +16,13 @@ from typing import Any
 DB_PATH = Path(__file__).resolve().parents[1] / "deployforge.db"
 ORG_ID = "deployforge.local"
 ORG_NAME = "Deployforge"
-SEED_USER_ID = "demo-user"
-SEED_USER_EMAIL = "demo@deployforge.local"
+SEED_USER_ID = "ash-deployforge-local"
+SEED_USER_EMAIL = "ash@deployforge.local"
+SEED_USER_PASSWORD = "ashtest123"
 NOW = datetime(2026, 6, 3, 10, 0, 0)
+ACTIVE_SEED_USER_ID = SEED_USER_ID
+
+FALLBACK_PASSWORD_HASH = "$2b$12$SeOeLpM4YInWxKPRSUxXEeBSyJSRAAaKQ2AaWVNotqnZ95sl5kMHq"
 
 
 PROJECTS = [
@@ -183,11 +186,23 @@ def has_column(con: sqlite3.Connection, table: str, column: str) -> bool:
 
 
 def seed_user(con: sqlite3.Connection) -> None:
+    global ACTIVE_SEED_USER_ID
+
     existing = con.execute("SELECT id FROM users WHERE id = ?", (SEED_USER_ID,)).fetchone()
-    if existing:
+    existing_by_email = con.execute("SELECT id FROM users WHERE email = ?", (SEED_USER_EMAIL,)).fetchone()
+    password_hash = hash_seed_password()
+    if existing_by_email:
+        ACTIVE_SEED_USER_ID = existing_by_email[0]
         con.execute(
-            "UPDATE users SET organization_id = ?, organization_name = ? WHERE id = ?",
-            (ORG_ID, ORG_NAME, SEED_USER_ID),
+            "UPDATE users SET organization_id = ?, organization_name = ?, password_hash = ? WHERE id = ?",
+            (ORG_ID, ORG_NAME, password_hash, ACTIVE_SEED_USER_ID),
+        )
+        return
+    if existing:
+        ACTIVE_SEED_USER_ID = existing[0]
+        con.execute(
+            "UPDATE users SET email = ?, organization_id = ?, organization_name = ?, password_hash = ? WHERE id = ?",
+            (SEED_USER_EMAIL, ORG_ID, ORG_NAME, password_hash, ACTIVE_SEED_USER_ID),
         )
         return
 
@@ -196,8 +211,17 @@ def seed_user(con: sqlite3.Connection) -> None:
         INSERT INTO users (id, email, organization_id, organization_name, password_hash, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (SEED_USER_ID, SEED_USER_EMAIL, ORG_ID, ORG_NAME, "seeded-password-hash", timestamp(0)),
+        (SEED_USER_ID, SEED_USER_EMAIL, ORG_ID, ORG_NAME, password_hash, timestamp(0)),
     )
+
+
+def hash_seed_password() -> str:
+    try:
+        from passlib.context import CryptContext
+
+        return CryptContext(schemes=["bcrypt"], deprecated="auto").hash(SEED_USER_PASSWORD)
+    except Exception:
+        return FALLBACK_PASSWORD_HASH
 
 
 def clear_previous_seed(con: sqlite3.Connection) -> None:
@@ -222,7 +246,7 @@ def seed_projects(con: sqlite3.Connection) -> None:
             """,
             (
                 project["id"],
-                SEED_USER_ID,
+                ACTIVE_SEED_USER_ID,
                 ORG_ID,
                 project["name"],
                 project["environment"],
@@ -464,7 +488,7 @@ def add_audit(
         """,
         (
             audit_id,
-            SEED_USER_ID,
+            ACTIVE_SEED_USER_ID,
             ORG_ID,
             action,
             entity_type,
@@ -502,11 +526,12 @@ def print_summary(con: sqlite3.Connection) -> None:
         """,
         (ORG_ID,),
     ).fetchone()[0]
+    print(f"Seeded account: {SEED_USER_EMAIL} / {SEED_USER_PASSWORD}")
     print(f"Seeded organization: {ORG_ID}")
     print(f"Projects visible to {ORG_ID}: {project_count}")
     print(f"Deployments visible to {ORG_ID}: {deployment_count}")
     print(f"Resources visible to {ORG_ID}: {resource_count}")
-    print("Create users like alice@deployforge.local to verify shared organization data.")
+    print(f"Create users like alice@{ORG_ID} to verify shared organization data.")
 
 
 if __name__ == "__main__":
