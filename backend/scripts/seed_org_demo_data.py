@@ -16,13 +16,13 @@ from typing import Any
 DB_PATH = Path(__file__).resolve().parents[1] / "deployforge.db"
 ORG_ID = "deploy-forge.local"
 ORG_NAME = "Deploy Forge"
-SEED_USER_ID = "ash-deploy-forge-local"
-SEED_USER_EMAIL = "ash@deploy-forge.local"
-SEED_USER_PASSWORD = "ashtest123"
+SEED_USER_ID = "ash-prod-deploy-forge-local"
+SEED_USER_EMAIL = "ash-prod@deploy-forge.local"
+SEED_USER_PASSWORD = "ashprod123"
 NOW = datetime(2026, 6, 3, 10, 0, 0)
 ACTIVE_SEED_USER_ID = SEED_USER_ID
 
-FALLBACK_PASSWORD_HASH = "$2b$12$SeOeLpM4YInWxKPRSUxXEeBSyJSRAAaKQ2AaWVNotqnZ95sl5kMHq"
+FALLBACK_PASSWORD_HASH = "$2b$12$eXFM8lGf6s6oB3DFoBszGeg6HvogtkKSjo2Qs2fF3caTAzT/3ddN."
 
 
 PROJECTS = [
@@ -120,6 +120,105 @@ PROJECTS = [
                 ("syn-ana-prod", "synapse_workspace", "northcentralus", ["vnet-ana-prod", "st-anaprod-raw", "st-anaprod-curated"], 418, {"spark_pool": "large"}),
                 ("kv-ana-prod", "key_vault", "northcentralus", ["rg-ana-prod"], 32, {"soft_delete": True}),
                 ("vm-ana-prod-jumpbox", "azurerm_linux_virtual_machine", "northcentralus", ["vnet-ana-prod", "kv-ana-prod"], 245, {"size": "Standard_D8s_v5"}),
+            ],
+        },
+    },
+    {
+        "id": "org-demo-prod-reliability",
+        "name": "Production Reliability Command Center",
+        "environment": "prod",
+        "monthly_cost": 1188,
+        "envs": {
+            "dev": [
+                ("rg-rel-dev", "resource_group", "eastus", [], 0, {"owner": "sre"}),
+                ("vnet-rel-dev", "virtual_network", "eastus", ["rg-rel-dev"], 36, {"cidr": "10.90.0.0/16"}),
+                ("log-rel-dev", "log_analytics_workspace", "eastus", ["rg-rel-dev"], 44, {"retention_days": 30}),
+                ("appi-rel-dev", "application_insights", "eastus", ["log-rel-dev"], 26, {"sampling": "adaptive"}),
+                ("func-rel-dev-alerts", "function_app", "eastus", ["appi-rel-dev"], 52, {"runtime": "python"}),
+            ],
+            "stage": [
+                ("rg-rel-stage", "resource_group", "eastus2", [], 0, {"owner": "sre"}),
+                ("vnet-rel-stage", "virtual_network", "eastus2", ["rg-rel-stage"], 54, {"cidr": "10.91.0.0/16"}),
+                ("log-rel-stage", "log_analytics_workspace", "eastus2", ["rg-rel-stage"], 92, {"retention_days": 60}),
+                ("appi-rel-stage", "application_insights", "eastus2", ["log-rel-stage"], 48, {"sampling": "adaptive"}),
+                ("func-rel-stage-alerts", "function_app", "eastus2", ["appi-rel-stage"], 88, {"runtime": "python"}),
+                ("sb-rel-stage", "service_bus_namespace", "eastus2", ["func-rel-stage-alerts"], 42, {"sku": "Standard"}),
+            ],
+            "prod": [
+                ("rg-rel-prod", "resource_group", "centralus", [], 0, {"owner": "sre"}),
+                ("vnet-rel-prod", "virtual_network", "centralus", ["rg-rel-prod"], 96, {"cidr": "10.92.0.0/16"}),
+                ("log-rel-prod", "log_analytics_workspace", "centralus", ["rg-rel-prod"], 226, {"retention_days": 180}),
+                ("appi-rel-prod", "application_insights", "centralus", ["log-rel-prod"], 86, {"sampling": "adaptive"}),
+                ("func-rel-prod-alerts", "function_app", "centralus", ["appi-rel-prod"], 144, {"runtime": "python"}),
+                ("sb-rel-prod", "service_bus_namespace", "centralus", ["func-rel-prod-alerts"], 74, {"sku": "Premium"}),
+                ("agw-rel-prod", "application_gateway", "centralus", ["vnet-rel-prod"], 168, {"waf": True}),
+                ("pip-rel-prod-status", "public_ip", "centralus", ["agw-rel-prod"], 38, {"exposure": "status-page"}),
+            ],
+        },
+    },
+    {
+        "id": "org-demo-prod-identity",
+        "name": "Zero Trust Identity Plane",
+        "environment": "prod",
+        "monthly_cost": 842,
+        "envs": {
+            "dev": [
+                ("rg-id-dev", "resource_group", "westus2", [], 0, {"owner": "security"}),
+                ("kv-id-dev", "key_vault", "westus2", ["rg-id-dev"], 22, {"soft_delete": True}),
+                ("st-id-dev-audit", "storage_account", "westus2", ["rg-id-dev"], 14, {"container": "audit"}),
+                ("func-id-dev-claims", "function_app", "westus2", ["kv-id-dev", "st-id-dev-audit"], 48, {"runtime": "node"}),
+            ],
+            "stage": [
+                ("rg-id-stage", "resource_group", "westus2", [], 0, {"owner": "security"}),
+                ("vnet-id-stage", "virtual_network", "westus2", ["rg-id-stage"], 52, {"cidr": "10.100.0.0/16"}),
+                ("kv-id-stage", "key_vault", "westus2", ["rg-id-stage"], 34, {"soft_delete": True}),
+                ("st-id-stage-audit", "storage_account", "westus2", ["rg-id-stage"], 32, {"container": "audit"}),
+                ("func-id-stage-claims", "function_app", "westus2", ["kv-id-stage", "st-id-stage-audit"], 96, {"runtime": "node"}),
+                ("sql-id-stage", "sql_database", "westus2", ["rg-id-stage"], 142, {"tier": "Standard"}),
+            ],
+            "prod": [
+                ("rg-id-prod", "resource_group", "eastus", [], 0, {"owner": "security"}),
+                ("vnet-id-prod", "virtual_network", "eastus", ["rg-id-prod"], 88, {"cidr": "10.101.0.0/16"}),
+                ("kv-id-prod", "key_vault", "eastus", ["rg-id-prod"], 48, {"soft_delete": True}),
+                ("st-id-prod-audit", "storage_account", "eastus", ["rg-id-prod"], 64, {"container": "audit", "replication": "GRS"}),
+                ("func-id-prod-claims", "function_app", "eastus", ["kv-id-prod", "st-id-prod-audit"], 148, {"runtime": "node"}),
+                ("sql-id-prod", "sql_database", "eastus", ["rg-id-prod"], 288, {"tier": "Premium"}),
+                ("vm-id-prod-breakglass", "azurerm_windows_virtual_machine", "eastus", ["vnet-id-prod", "kv-id-prod"], 232, {"size": "Standard_D8s_v5"}),
+            ],
+        },
+    },
+    {
+        "id": "org-demo-prod-commerce",
+        "name": "Multi Region Commerce Platform",
+        "environment": "prod",
+        "monthly_cost": 1476,
+        "envs": {
+            "dev": [
+                ("rg-com-dev", "resource_group", "centralus", [], 0, {"owner": "commerce"}),
+                ("vnet-com-dev", "virtual_network", "centralus", ["rg-com-dev"], 44, {"cidr": "10.110.0.0/16"}),
+                ("st-com-dev-catalog", "storage_account", "centralus", ["rg-com-dev"], 18, {"container": "catalog"}),
+                ("sql-com-dev", "sql_database", "centralus", ["rg-com-dev"], 84, {"tier": "Basic"}),
+                ("app-com-dev-api", "app_service", "centralus", ["vnet-com-dev", "sql-com-dev"], 66, {"sku": "B1"}),
+            ],
+            "stage": [
+                ("rg-com-stage", "resource_group", "centralus", [], 0, {"owner": "commerce"}),
+                ("vnet-com-stage", "virtual_network", "centralus", ["rg-com-stage"], 68, {"cidr": "10.111.0.0/16"}),
+                ("st-com-stage-catalog", "storage_account", "centralus", ["rg-com-stage"], 38, {"container": "catalog"}),
+                ("sql-com-stage", "sql_database", "centralus", ["rg-com-stage"], 176, {"tier": "Standard"}),
+                ("app-com-stage-api", "app_service", "centralus", ["vnet-com-stage", "sql-com-stage"], 118, {"sku": "S1"}),
+                ("cdn-com-stage", "cdn_profile", "centralus", ["st-com-stage-catalog"], 46, {"sku": "Standard"}),
+            ],
+            "prod": [
+                ("rg-com-prod-primary", "resource_group", "eastus", [], 0, {"owner": "commerce"}),
+                ("rg-com-prod-secondary", "resource_group", "westus2", [], 0, {"owner": "commerce"}),
+                ("vnet-com-prod-primary", "virtual_network", "eastus", ["rg-com-prod-primary"], 96, {"cidr": "10.112.0.0/16"}),
+                ("vnet-com-prod-secondary", "virtual_network", "westus2", ["rg-com-prod-secondary"], 96, {"cidr": "10.113.0.0/16"}),
+                ("st-com-prod-catalog", "storage_account", "eastus", ["rg-com-prod-primary"], 82, {"container": "catalog", "replication": "GRS"}),
+                ("sql-com-prod", "sql_database", "eastus", ["rg-com-prod-primary"], 356, {"tier": "BusinessCritical"}),
+                ("app-com-prod-api", "app_service", "eastus", ["vnet-com-prod-primary", "sql-com-prod"], 214, {"sku": "P1v3"}),
+                ("app-com-prod-dr", "app_service", "westus2", ["vnet-com-prod-secondary", "sql-com-prod"], 176, {"sku": "P1v3"}),
+                ("cdn-com-prod", "cdn_profile", "eastus", ["st-com-prod-catalog"], 74, {"sku": "Premium"}),
+                ("pip-com-prod", "public_ip", "eastus", ["app-com-prod-api"], 38, {"exposure": "checkout"}),
             ],
         },
     },
