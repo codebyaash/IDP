@@ -30,6 +30,7 @@ def ensure_local_schema() -> None:
         return
 
     project_columns = {column["name"] for column in inspector.get_columns("projects")}
+    user_columns = set()
     template_columns = set()
     deployment_columns = set()
     resource_columns = set()
@@ -37,6 +38,8 @@ def ensure_local_schema() -> None:
     table_names = inspector.get_table_names()
     if "iac_templates" in table_names:
         template_columns = {column["name"] for column in inspector.get_columns("iac_templates")}
+    if "users" in table_names:
+        user_columns = {column["name"] for column in inspector.get_columns("users")}
     if "deployments" in table_names:
         deployment_columns = {column["name"] for column in inspector.get_columns("deployments")}
     if "resources" in inspector.get_table_names():
@@ -45,8 +48,14 @@ def ensure_local_schema() -> None:
         rollback_columns = {column["name"] for column in inspector.get_columns("rollback_events")}
 
     with engine.begin() as connection:
+        if "users" in table_names and "organization_id" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN organization_id VARCHAR DEFAULT 'deployforge.local' NOT NULL"))
+        if "users" in table_names and "organization_name" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN organization_name VARCHAR DEFAULT 'Deployforge' NOT NULL"))
         if "user_id" not in project_columns:
             connection.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR"))
+        if "organization_id" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN organization_id VARCHAR DEFAULT 'deployforge.local' NOT NULL"))
         if "iac_templates" in table_names and "environment" not in template_columns:
             connection.execute(text("ALTER TABLE iac_templates ADD COLUMN environment VARCHAR DEFAULT 'dev'"))
         if "deployments" in table_names and "environment" not in deployment_columns:
@@ -57,6 +66,12 @@ def ensure_local_schema() -> None:
             connection.execute(text("ALTER TABLE resources ADD COLUMN resource_metadata JSON DEFAULT '{}'"))
         if "rollback_events" in table_names and "environment" not in rollback_columns:
             connection.execute(text("ALTER TABLE rollback_events ADD COLUMN environment VARCHAR DEFAULT 'dev'"))
+        connection.execute(
+            text(
+                "UPDATE projects SET organization_id = "
+                "COALESCE((SELECT users.organization_id FROM users WHERE users.id = projects.user_id), organization_id)"
+            )
+        )
 
 
 app = FastAPI(
@@ -86,6 +101,7 @@ app = FastAPI(
         {"name": "Templates", "description": "Upload, validate, and plan IaC templates."},
         {"name": "Deployments", "description": "Run simulated deployment pipelines and rollback snapshots."},
         {"name": "Resources", "description": "Inspect latest environment-scoped resources and cost estimates."},
+        {"name": "Profile", "description": "Read current user details and audit activity."},
         {"name": "System", "description": "Health checks and API metadata."},
     ],
 )

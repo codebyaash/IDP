@@ -70,6 +70,52 @@ def test_register_and_login(client: TestClient) -> None:
 
     assert login.status_code == 200
     assert login.json()["user"]["email"] == "new-user@deployforge.local"
+    assert login.json()["user"]["organization_id"] == "deployforge.local"
+
+
+def test_users_in_same_organization_share_projects(client: TestClient) -> None:
+    register = client.post(
+        "/api/auth/register",
+        json={"email": "teammate@deployforge.local", "password": "strong-password"},
+    )
+    token = register.json()["access_token"]
+
+    response = client.get("/api/projects", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert any(project["id"] == "demo-azure-core" for project in response.json())
+
+
+def test_users_in_different_organizations_do_not_share_projects(client: TestClient) -> None:
+    register = client.post(
+        "/api/auth/register",
+        json={"email": "external@example.com", "password": "strong-password"},
+    )
+    token = register.json()["access_token"]
+
+    response = client.get("/api/projects", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_profile_tracks_user_and_organization_activity(client: TestClient, auth_headers: dict[str, str]) -> None:
+    create = client.post(
+        "/api/projects",
+        json={"name": "Audit Platform", "cloud_provider": "azure", "environment": "dev"},
+        headers=auth_headers,
+    )
+
+    assert create.status_code == 201
+
+    profile = client.get("/api/me", headers=auth_headers)
+
+    assert profile.status_code == 200
+    payload = profile.json()
+    assert payload["user"]["organization_id"] == "deployforge.local"
+    assert payload["summary"]["created_project"] == 1
+    assert any(item["action"] == "created_project" for item in payload["activity"])
+    assert any(item["action"] == "created_project" for item in payload["organization_activity"])
 
 
 def test_projects_require_auth(client: TestClient) -> None:

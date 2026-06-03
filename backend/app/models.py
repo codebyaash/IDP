@@ -17,10 +17,12 @@ class Project(Base):
         CheckConstraint("environment IN ('dev', 'stage', 'prod')", name="ck_projects_environment"),
         CheckConstraint("monthly_cost >= 0", name="ck_projects_monthly_cost_non_negative"),
         Index("ix_projects_user_created_at", "user_id", "created_at"),
+        Index("ix_projects_organization_created_at", "organization_id", "created_at"),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    organization_id: Mapped[str] = mapped_column(String(255), nullable=False, default="deployforge.local")
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     cloud_provider: Mapped[str] = mapped_column(String(40), nullable=False, default="azure")
     environment: Mapped[str] = mapped_column(String(40), nullable=False, default="dev")
@@ -128,7 +130,32 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    organization_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    organization_name: Mapped[str] = mapped_column(String(255), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     projects: Mapped[list[Project]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("ix_audit_logs_user_created_at", "user_id", "created_at"),
+        Index("ix_audit_logs_organization_created_at", "organization_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    organization_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    action: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    project_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    environment: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    user: Mapped[User] = relationship(back_populates="audit_logs")

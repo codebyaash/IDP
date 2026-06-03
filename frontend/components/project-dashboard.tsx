@@ -42,6 +42,8 @@ import {
 const fallbackProjects: Project[] = [
   {
     id: "demo-azure-core",
+    user_id: "demo-user",
+    organization_id: "deployforge.local",
     name: "Azure Core Network",
     cloud_provider: "azure",
     environment: "dev",

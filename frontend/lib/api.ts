@@ -2,6 +2,8 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.
 
 export type Project = {
   id: string;
+  user_id: string;
+  organization_id: string;
   name: string;
   cloud_provider: string;
   environment: string;
@@ -22,7 +24,29 @@ export type AuthResponse = {
   user: {
     id: string;
     email: string;
+    organization_id: string;
+    organization_name: string;
+    created_at: string;
   };
+};
+
+export type AuditLog = {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  project_id: string | null;
+  environment: string | null;
+  message: string;
+  metadata_json: Record<string, unknown>;
+  created_at: string;
+};
+
+export type Profile = {
+  user: AuthResponse["user"];
+  activity: AuditLog[];
+  organization_activity: AuditLog[];
+  summary: Record<string, number>;
 };
 
 export type TemplateUploadResult = {
@@ -44,6 +68,10 @@ export type TemplateUploadResult = {
     estimated_monthly_cost: number;
   }>;
   warnings: string[];
+};
+
+export type Template = TemplateUploadResult["template"] & {
+  parsed_json: Record<string, unknown>;
 };
 
 export type Resource = {
@@ -156,6 +184,17 @@ export async function register(email: string, password: string): Promise<AuthRes
   return response.json();
 }
 
+export async function fetchProfile(token: string): Promise<Profile> {
+  const response = await fetch(`${API_BASE_URL}/api/me`, {
+    cache: "no-store",
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error("Unable to load profile.");
+  }
+  return response.json();
+}
+
 export async function fetchProjects(token: string): Promise<Project[]> {
   const response = await fetch(`${API_BASE_URL}/api/projects`, {
     cache: "no-store",
@@ -196,6 +235,17 @@ export async function uploadTemplate(
   });
   if (!response.ok) {
     throw new Error("Unable to upload template.");
+  }
+  return response.json();
+}
+
+export async function fetchTemplates(projectId: string, token: string, environment = "dev"): Promise<Template[]> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/templates?environment=${environment}`, {
+    cache: "no-store",
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error("Unable to load templates.");
   }
   return response.json();
 }

@@ -21,6 +21,7 @@ class ProjectRead(ProjectBase):
 
     id: str
     user_id: str
+    organization_id: str
     status: str
     monthly_cost: float
     created_at: datetime

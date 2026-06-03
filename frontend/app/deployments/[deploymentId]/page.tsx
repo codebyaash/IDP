@@ -73,9 +73,9 @@ export default function DeploymentDetailPage() {
     return (
       <main className="min-h-screen bg-[#f6f8fb] px-6 py-8 text-[#172033]">
         <section className="mx-auto max-w-6xl rounded-md border border-slate-200 bg-white p-6 shadow-sm">
-          <Link className="inline-flex items-center gap-2 text-sm font-semibold text-ink" href="/">
+          <Link className="inline-flex items-center gap-2 text-sm font-semibold text-ink" href="/deployments">
             <ArrowLeft size={16} />
-            Dashboard
+            Deployments
           </Link>
           <p className="mt-5 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
             {error || "Deployment not found."}
@@ -90,9 +90,9 @@ export default function DeploymentDetailPage() {
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <Link className="inline-flex items-center gap-2 text-sm font-semibold text-ink" href="/">
+            <Link className="inline-flex items-center gap-2 text-sm font-semibold text-ink" href="/deployments">
               <ArrowLeft size={16} />
-              Dashboard
+              Deployments
             </Link>
             <p className="mt-4 text-sm font-semibold uppercase tracking-wide text-signal">Deployment Detail</p>
             <h1 className="mt-2 text-3xl font-semibold">{deployment.plan.template_name}</h1>

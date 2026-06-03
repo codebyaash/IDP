@@ -1,5 +1,5 @@
-import { ProjectDashboard } from "@/components/project-dashboard";
+import { WorkspacePage } from "@/components/workspace-pages";
 
 export default function Home() {
-  return <ProjectDashboard />;
+  return <WorkspacePage mode="overview" />;
 }

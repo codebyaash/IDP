@@ -3,13 +3,14 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
 from app.models import User
-from app.schemas.auth import AuthCredentials, TokenResponse
+from app.schemas.auth import AuthCredentials, ProfileRead, TokenResponse, UserRead
 from app.schemas.deployment import Deployment, DeploymentPlan, TemplateValidation
 from app.schemas.project import DeploymentEnvironment, ProjectCreate, ProjectRead
 from app.schemas.resource import CostEstimate, PersistedResource
 from app.schemas.rollback import RollbackRequest, RollbackResult
 from app.schemas.template import TemplateRead, TemplateUploadResult
 from app.core.database import get_db
+from app.services.audit import list_organization_activity, list_user_activity, log_activity, user_activity_summary
 from app.services.auth import authenticate_user, create_user, get_user_by_email, token_for_user
 from app.services.deployments import deploy_template, get_deployment, list_deployments, rollback_deployment
 from app.services.projects import create_project, get_project, list_projects
@@ -59,6 +60,14 @@ def register(credentials: AuthCredentials, db: Session = Depends(get_db)) -> Tok
     if get_user_by_email(db, credentials.email) is not None:
         raise HTTPException(status_code=409, detail="Email is already registered.")
     user = create_user(db, credentials)
+    log_activity(
+        db,
+        user,
+        "registered",
+        "user",
+        "User joined the organization workspace.",
+        entity_id=user.id,
+    )
     return token_for_user(user)
 
 
@@ -67,7 +76,21 @@ def login(credentials: AuthCredentials, db: Session = Depends(get_db)) -> TokenR
     user = authenticate_user(db, credentials)
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password.")
+    log_activity(db, user, "logged_in", "user", "User signed in.", entity_id=user.id)
     return token_for_user(user)
+
+
+@router.get("/me", response_model=ProfileRead, tags=["Profile"], summary="Get current user profile")
+def get_profile(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ProfileRead:
+    return ProfileRead(
+        user=UserRead.model_validate(current_user),
+        activity=list_user_activity(db, current_user.id),
+        organization_activity=list_organization_activity(db, current_user.organization_id),
+        summary=user_activity_summary(db, current_user.id),
+    )
 
 
 @router.get("/projects", response_model=list[ProjectRead], tags=["Projects"], summary="List projects")
@@ -75,7 +98,7 @@ def get_projects(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[ProjectRead]:
-    return list_projects(db, current_user.id)
+    return list_projects(db, current_user.organization_id)
 
 
 @router.post("/projects", response_model=ProjectRead, status_code=201, tags=["Projects"], summary="Create a project")
@@ -84,7 +107,18 @@ def post_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ProjectRead:
-    return create_project(db, payload, current_user.id)
+    project = create_project(db, payload, current_user)
+    log_activity(
+        db,
+        current_user,
+        "created_project",
+        "project",
+        f"Created project {project.name}.",
+        entity_id=project.id,
+        project_id=project.id,
+        environment=project.environment,
+    )
+    return project
 
 
 @router.get("/projects/{project_id}", response_model=ProjectRead, tags=["Projects"], summary="Get a project")
@@ -93,7 +127,7 @@ def get_project_by_id(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ProjectRead:
-    project = get_project(db, project_id, current_user.id)
+    project = get_project(db, project_id, current_user.organization_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found.")
     return project
@@ -111,7 +145,7 @@ def get_project_deployments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[Deployment]:
-    if get_project(db, project_id, current_user.id) is None:
+    if get_project(db, project_id, current_user.organization_id) is None:
         raise HTTPException(status_code=404, detail="Project not found.")
     return list_deployments(db, project_id, environment)
 
@@ -123,7 +157,7 @@ def get_deployment_by_id(
     current_user: User = Depends(get_current_user),
 ) -> Deployment:
     deployment = get_deployment(db, deployment_id)
-    if deployment is None or get_project(db, deployment.project_id, current_user.id) is None:
+    if deployment is None or get_project(db, deployment.project_id, current_user.organization_id) is None:
         raise HTTPException(status_code=404, detail="Deployment not found.")
     return deployment
 
@@ -142,12 +176,23 @@ def rollback_deployment_by_id(
     current_user: User = Depends(get_current_user),
 ) -> RollbackResult:
     deployment = get_deployment(db, deployment_id)
-    if deployment is None or get_project(db, deployment.project_id, current_user.id) is None:
+    if deployment is None or get_project(db, deployment.project_id, current_user.organization_id) is None:
         raise HTTPException(status_code=404, detail="Deployment not found.")
 
     result = rollback_deployment(db, deployment_id, payload.reason)
     if result is None:
         raise HTTPException(status_code=422, detail="Deployment cannot be rolled back.")
+    log_activity(
+        db,
+        current_user,
+        "rolled_back_deployment",
+        "deployment",
+        f"Rolled back deployment {deployment_id}.",
+        entity_id=result.rollback_deployment.id,
+        project_id=result.rollback_deployment.project_id,
+        environment=result.rollback_deployment.environment,
+        metadata={"source_deployment_id": deployment_id, "reason": payload.reason},
+    )
     return result
 
 
@@ -163,7 +208,7 @@ def get_project_templates(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[TemplateRead]:
-    if get_project(db, project_id, current_user.id) is None:
+    if get_project(db, project_id, current_user.organization_id) is None:
         raise HTTPException(status_code=404, detail="Project not found.")
     return list_templates(db, project_id, environment)
 
@@ -180,7 +225,7 @@ def get_project_resources(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[PersistedResource]:
-    if get_project(db, project_id, current_user.id) is None:
+    if get_project(db, project_id, current_user.organization_id) is None:
         raise HTTPException(status_code=404, detail="Project not found.")
     return list_project_resources(db, project_id, environment)
 
@@ -197,7 +242,7 @@ def get_project_cost(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> CostEstimate:
-    if get_project(db, project_id, current_user.id) is None:
+    if get_project(db, project_id, current_user.organization_id) is None:
         raise HTTPException(status_code=404, detail="Project not found.")
     return get_project_cost_estimate(db, project_id, environment)
 
@@ -219,13 +264,24 @@ async def upload_project_template(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TemplateUploadResult:
-    if get_project(db, project_id, current_user.id) is None:
+    if get_project(db, project_id, current_user.organization_id) is None:
         raise HTTPException(status_code=404, detail="Project not found.")
 
     content = (await file.read()).decode("utf-8")
     parsed = _parse_uploaded_template(file.filename or "template", content)
 
     template = create_template(db, project_id=project_id, raw_content=content, parsed=parsed, environment=environment)
+    log_activity(
+        db,
+        current_user,
+        "uploaded_template",
+        "template",
+        f"Uploaded template {template.file_name}.",
+        entity_id=template.id,
+        project_id=project_id,
+        environment=environment,
+        metadata={"resource_count": len(parsed.resources), "version": template.version},
+    )
     return TemplateUploadResult(template=template, resources=parsed.resources, warnings=[])
 
 
@@ -241,7 +297,7 @@ def plan_saved_template(
     current_user: User = Depends(get_current_user),
 ) -> DeploymentPlan:
     template = get_template(db, template_id)
-    if template is None or get_project(db, template.project_id, current_user.id) is None:
+    if template is None or get_project(db, template.project_id, current_user.organization_id) is None:
         raise HTTPException(status_code=404, detail="Template not found.")
 
     plan = get_template_plan(db, template_id)
@@ -263,12 +319,23 @@ def deploy_saved_template(
     current_user: User = Depends(get_current_user),
 ) -> Deployment:
     template = get_template(db, template_id)
-    if template is None or get_project(db, template.project_id, current_user.id) is None:
+    if template is None or get_project(db, template.project_id, current_user.organization_id) is None:
         raise HTTPException(status_code=404, detail="Template not found.")
 
     deployment = deploy_template(db, template_id)
     if deployment is None:
         raise HTTPException(status_code=404, detail="Template not found.")
+    log_activity(
+        db,
+        current_user,
+        "deployed_template",
+        "deployment",
+        f"Ran deployment for {template.file_name}.",
+        entity_id=deployment.id,
+        project_id=deployment.project_id,
+        environment=deployment.environment,
+        metadata={"template_id": template.id, "monthly_cost": deployment.plan.estimated_monthly_cost},
+    )
     return deployment
 
 
