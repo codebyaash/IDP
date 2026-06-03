@@ -1,0 +1,9 @@
+resources:
+  - name: duplicate-demo
+    type: resource_group
+    provider: azure
+    region: eastus
+  - name: duplicate-demo
+    type: storage_account
+    provider: azure
+    region: eastus

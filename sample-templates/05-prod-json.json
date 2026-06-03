@@ -1,0 +1,25 @@
+{
+  "resources": [
+    {
+      "name": "rg-billing-prod",
+      "type": "resource_group",
+      "provider": "azure",
+      "region": "eastus2",
+      "tags": {
+        "owner": "finance",
+        "environment": "prod"
+      }
+    },
+    {
+      "name": "stbillingprod001",
+      "type": "storage_account",
+      "provider": "azure",
+      "region": "eastus2",
+      "dependencies": ["rg-billing-prod"],
+      "tags": {
+        "owner": "finance",
+        "environment": "prod"
+      }
+    }
+  ]
+}

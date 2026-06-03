@@ -1,0 +1,26 @@
+resources:
+  - name: rg-api-stage
+    type: resource_group
+    provider: azure
+    region: centralus
+    tags:
+      owner: platform
+      environment: stage
+  - name: vnet-api-stage
+    type: virtual_network
+    provider: azure
+    region: centralus
+    dependencies:
+      - rg-api-stage
+    tags:
+      owner: platform
+      environment: stage
+  - name: stapistage001
+    type: storage_account
+    provider: azure
+    region: centralus
+    dependencies:
+      - rg-api-stage
+    tags:
+      owner: platform
+      environment: stage

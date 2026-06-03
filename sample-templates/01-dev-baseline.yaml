@@ -1,0 +1,45 @@
+resources:
+  - name: rg-web-dev
+    type: resource_group
+    provider: azure
+    region: eastus
+    tags:
+      owner: platform
+      environment: dev
+  - name: vnet-web-dev
+    type: virtual_network
+    provider: azure
+    region: eastus
+    dependencies:
+      - rg-web-dev
+    tags:
+      owner: platform
+      environment: dev
+  - name: snet-app-dev
+    type: subnet
+    provider: azure
+    region: eastus
+    dependencies:
+      - vnet-web-dev
+    tags:
+      owner: platform
+      environment: dev
+  - name: stwebdev001
+    type: storage_account
+    provider: azure
+    region: eastus
+    dependencies:
+      - rg-web-dev
+    tags:
+      owner: platform
+      environment: dev
+  - name: vm-app-dev
+    type: vm
+    provider: azure
+    region: eastus
+    dependencies:
+      - snet-app-dev
+      - stwebdev001
+    tags:
+      owner: platform
+      environment: dev

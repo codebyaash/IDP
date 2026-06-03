@@ -1,0 +1,37 @@
+resources:
+  - name: rg-web-dev
+    type: resource_group
+    provider: azure
+    region: eastus
+    tags:
+      owner: platform
+      environment: dev
+  - name: vnet-web-dev
+    type: virtual_network
+    provider: azure
+    region: eastus
+    dependencies:
+      - rg-web-dev
+    tags:
+      owner: platform
+      environment: dev
+  - name: vm-app-dev
+    type: vm
+    provider: azure
+    region: westus
+    dependencies:
+      - vnet-web-dev
+    tags:
+      owner: platform
+      environment: dev
+      resize: medium
+  - name: pip-app-dev
+    type: public_ip
+    provider: azure
+    region: westus
+    dependencies:
+      - vm-app-dev
+    public_access: true
+    tags:
+      owner: platform
+      environment: dev
